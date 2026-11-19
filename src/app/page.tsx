@@ -62,7 +62,8 @@ export default function HomePage() {
     setMotionEnabled(storedMotion);
     document.documentElement.dataset.theme = storedDark ? "dark" : "light";
     document.documentElement.dataset.motion = storedMotion ? "on" : "off";
-    const code = new URLSearchParams(window.location.search).get("room");
+    const queryCode = new URLSearchParams(window.location.search).get("room");
+    const code = queryCode ?? localStorage.getItem("bus-last-room");
     if (!code) return;
     setPrefillCode(code.toUpperCase());
     if (!supabase) { setModal("join"); return; }
@@ -74,10 +75,16 @@ export default function HomePage() {
         if (!active) return;
         if (foundRoom) {
           const { data: member } = await supabase.from("players").select("id").eq("room_id", foundRoom.id).eq("user_id", user.id).maybeSingle();
-          if (member) { setRoom({ id: foundRoom.id, code: foundRoom.code }); return; }
+          if (member) {
+            await supabase.rpc("heartbeat_room", { p_room_id: foundRoom.id });
+            localStorage.setItem("bus-last-room", foundRoom.code);
+            if (active) setRoom({ id: foundRoom.id, code: foundRoom.code });
+            return;
+          }
         }
-        setModal("join");
-      } catch { if (active) setModal("join"); }
+        if (queryCode) setModal("join");
+        else localStorage.removeItem("bus-last-room");
+      } catch { if (active && queryCode) setModal("join"); }
     })();
     return () => { active = false; };
   }, [supabase]);
@@ -97,10 +104,14 @@ export default function HomePage() {
   }), []);
   const enterRoom = (entry: RoomEntry) => {
     setRoom(entry); setModal(null); setPrefillCode(entry.code);
+    localStorage.setItem("bus-last-room", entry.code);
     window.history.pushState({}, "", `/?room=${entry.code}`);
     playTone(sound, 660);
   };
-  const exitRoom = () => { setRoom(null); window.history.pushState({}, "", "/"); };
+  const exitRoom = () => {
+    if (room && supabase) void supabase.rpc("leave_room", { p_room_id: room.id });
+    setRoom(null); localStorage.removeItem("bus-last-room"); window.history.pushState({}, "", "/");
+  };
 
   return <main className="app-shell" data-theme={dark ? "dark" : "light"}><MotionConfig reducedMotion={motionEnabled ? "user" : "always"}>
     <header className="wrap topbar">
@@ -122,7 +133,7 @@ export default function HomePage() {
         <motion.div className="hero-copy" initial={false} animate={{ opacity: 1, x: 0 }} transition={{ duration: motionEnabled ? .3 : 0, ease: "easeOut" }}>
           <div className="eyebrow"><span className="eyebrow-dot" /> لعبة الحروف اللي بتجمعنا</div>
           <h1>فاكر اللعبة؟<span>أتوبيس كومبليت</span></h1>
-          <p>حرف واحد، ست فئات، وتحدّي ممتع. ادعُ أصحابك إلى غرفة والعبوا أونلاين من أي مكان.</p>
+          <p>حرف واحد، وفئات تختاروها، وتحدّي ممتع. ادعُ أصحابك إلى غرفة والعبوا أونلاين من أي مكان.</p>
           <div className="button-row">
             <button className="btn btn-primary" onClick={() => setModal("create")}><Play fill="currentColor" /> ابدأ اللعب <ArrowLeft /></button>
             <button className="btn btn-light" onClick={() => { setPrefillCode(""); setModal("join"); }}><DoorOpen /> انضم لغرفة</button>
@@ -150,7 +161,7 @@ export default function HomePage() {
         <div className="section-heading"><div><div className="section-kicker">تبدأ في ثواني</div><h2>ثلاث خطوات وتلاقوا نفسكم بتتنافسوا</h2></div><p>اللعبة بسيطة من أول مرة، وكل جولة بتطلع إجابات وحكايات ما كانتش على البال.</p></div>
         <div className="steps-grid">
           <motion.article className="step-card" whileHover={motionEnabled ? { y: -4 } : undefined}><div className="step-number">٠١</div><h3>افتحوا غرفة</h3><p>أنشئ غرفة وشارك كودها أو رابط الدعوة مع أصحابك.</p></motion.article>
-          <motion.article className="step-card" whileHover={motionEnabled ? { y: -4 } : undefined}><div className="step-number">٠٢</div><h3>اختاروا الحرف</h3><p>حرف عربي وست فئات ووقت محدد. كل لاعب يكتب إجاباته من جهازه.</p></motion.article>
+          <motion.article className="step-card" whileHover={motionEnabled ? { y: -4 } : undefined}><div className="step-number">٠٢</div><h3>اختاروا الحرف</h3><p>اختاروا فئات الجولة من الفئات الجاهزة أو أضيفوا فئاتكم. كل لاعب يكتب إجاباته من جهازه.</p></motion.article>
           <motion.article className="step-card" whileHover={motionEnabled ? { y: -4 } : undefined}><div className="step-number">٠٣</div><h3>راجعوا واكسبوا</h3><p>شوفوا إجابات بعض، صوّتوا على المختلف عليه، واجمعوا النقاط.</p></motion.article>
         </div>
         <div className="score-strip" id="points">

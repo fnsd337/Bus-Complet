@@ -1,16 +1,16 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, BusFront, Check, CheckCheck, Copy, LogOut, Moon, RotateCcw, Sun, Trophy, Volume2, VolumeX, WifiOff, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BusFront, Check, CheckCheck, Copy, LogOut, Moon, Plus, RotateCcw, Share2, Sun, Trophy, Volume2, VolumeX, WifiOff, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ARABIC_LETTERS, answerStartsWithLetter, CATEGORIES, type Answer, type CategoryId, type Player,
+  ARABIC_LETTERS, answerStartsWithLetter, CATEGORIES, getCategory, type Answer, type AnswerVote, type CategoryId, type Player,
   type Room, type Round, type Settings
 } from "@/lib/game";
 import PlayerAvatar from "@/components/player-avatar";
 import { ensureUser, getSupabase } from "@/lib/supabase";
 
-type RoomState = { room: Room; players: Player[]; rounds: Round[]; answers: Answer[] };
+type RoomState = { room: Room; players: Player[]; rounds: Round[]; answers: Answer[]; votes: AnswerVote[] };
 type GameRoomProps = { roomId: string; roomCode: string; sound: boolean; motionEnabled: boolean; onSound: () => void; onToggleSound: () => void; onExit: () => void };
 type Reaction = { id: number; emoji: string; name: string };
 const EMOJIS = ["😂", "🔥", "👏", "😎", "❤️"];
@@ -32,6 +32,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
   const [reviewPlayerIndex, setReviewPlayerIndex] = useState(0);
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [newCategory, setNewCategory] = useState("");
   const [values, setValues] = useState<Partial<Record<CategoryId, string>>>({});
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,8 +56,12 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
       ? await supabase.from("answers").select("*").in("round_id", rounds.map((round) => round.id))
       : { data: [] as Answer[], error: null };
     if (answerResult.error) throw answerResult.error;
+    const voteResult = rounds.length
+      ? await supabase.from("answer_votes").select("*").in("round_id", rounds.map((round) => round.id))
+      : { data: [] as AnswerVote[], error: null };
+    if (voteResult.error) throw voteResult.error;
     const mappedAnswers = ((answerResult.data ?? []) as Array<Record<string, unknown>>).map((answer) => ({ ...answer, values: answer.answer_values ?? {} })) as unknown as Answer[];
-    setState({ room: roomResult.data as Room, players: (playersResult.data ?? []) as Player[], rounds, answers: mappedAnswers });
+    setState({ room: roomResult.data as Room, players: (playersResult.data ?? []) as Player[], rounds, answers: mappedAnswers, votes: (voteResult.data ?? []) as AnswerVote[] });
   }, [roomId, supabase]);
   refreshRef.current = refresh;
 
@@ -88,6 +93,20 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   const allCategoriesFilled = Boolean(state && state.room.settings.categories.length && state.room.settings.categories.every((category) => Boolean(values[category]?.trim())));
   const allAnswersStartWithLetter = Boolean(currentRound && state && state.room.settings.categories.every((category) => answerStartsWithLetter(values[category] ?? "", currentRound.letter)));
   const rankedPlayers = [...(state?.players ?? [])].sort((a, b) => b.total_score - a.total_score || a.joined_at.localeCompare(b.joined_at));
+  const categoryOptions = [...CATEGORIES, ...(settings?.custom_categories ?? [])];
+  const roomWinsLeader = [...(state?.players ?? [])].sort((a, b) => (b.wins ?? 0) - (a.wins ?? 0))[0];
+  const streakLeader = [...(state?.players ?? [])].sort((a, b) => (b.best_win_streak ?? 0) - (a.best_win_streak ?? 0))[0];
+  const fastestLeader = [...(state?.players ?? [])].filter((player) => player.fastest_bus_ms != null).sort((a, b) => (a.fastest_bus_ms ?? Infinity) - (b.fastest_bus_ms ?? Infinity))[0];
+  const currentMatchUniqueAnswers = (playerId: string) => (state?.answers ?? [])
+    .filter((answer) => answer.player_id === playerId)
+    .reduce((total, answer) => total + Object.values(answer.scores ?? {}).filter((score) => score === 10).length, 0);
+  const uniqueAnswerLeader = [...(state?.players ?? [])].sort((a, b) => currentMatchUniqueAnswers(b.id) - currentMatchUniqueAnswers(a.id))[0];
+  const matchChampions = rankedPlayers.filter((player) => player.total_score === rankedPlayers[0]?.total_score);
+  const formatRecordTime = (milliseconds: number | null | undefined) => {
+    if (milliseconds == null) return "لسه مفيش رقم";
+    const seconds = milliseconds / 1000;
+    return seconds < 60 ? `${seconds.toFixed(1)} ثانية` : `${Math.floor(seconds / 60)} د ${Math.round(seconds % 60)} ث`;
+  };
 
   const notify = useCallback((message: string) => {
     setToast(message);
@@ -116,6 +135,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
       .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `room_id=eq.${roomId}` }, () => void refreshRef.current())
       .on("postgres_changes", { event: "*", schema: "public", table: "rounds", filter: `room_id=eq.${roomId}` }, () => void refreshRef.current())
       .on("postgres_changes", { event: "*", schema: "public", table: "answers", filter: shownRound?.id ? `round_id=eq.${shownRound.id}` : `round_id=eq.00000000-0000-0000-0000-000000000000`, }, () => void refreshRef.current())
+      .on("postgres_changes", { event: "*", schema: "public", table: "answer_votes", filter: shownRound?.id ? `round_id=eq.${shownRound.id}` : `round_id=eq.00000000-0000-0000-0000-000000000000`, }, () => void refreshRef.current())
       .on("broadcast", { event: "reaction" }, ({ payload }) => {
         const item = payload as { emoji: string; name: string };
         const id = Date.now() + Math.random();
@@ -173,12 +193,37 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
     catch { notify(url); }
   };
 
+  const shareInvite = async () => {
+    const url = `${window.location.origin}/?room=${roomCode}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: "أتوبيس كومبليت", text: "تعالى العب أتوبيس كومبليت معايا!", url }); }
+      catch (cause) { if (cause instanceof Error && cause.name !== "AbortError") notify("تعذرت مشاركة الرابط. استخدم زر نسخ الدعوة."); }
+      return;
+    }
+    await copyInvite();
+  };
+
   const updateSetting = (change: Partial<Settings>) => setSettings((current) => current ? { ...current, ...change } : current);
   const toggleCategory = (category: CategoryId) => setSettings((current) => {
     if (!current) return current;
     const categories = current.categories.includes(category) ? current.categories.filter((item) => item !== category) : [...current.categories, category];
+    if (categories.length > 10) { notify("اختار بحد أقصى ١٠ فئات."); return current; }
     return categories.length ? { ...current, categories } : current;
   });
+
+  const addCustomCategory = () => {
+    const label = newCategory.trim();
+    if (!settings) return;
+    if (label.length < 2 || label.length > 20) { notify("اسم الفئة يكون من حرفين إلى ٢٠ حرفًا."); return; }
+    if (settings.custom_categories?.some((category) => category.label.toLocaleLowerCase() === label.toLocaleLowerCase()) || CATEGORIES.some((category) => category.label === label)) {
+      notify("الفئة دي موجودة بالفعل."); return;
+    }
+    if (settings.categories.length >= 10) { notify("وصلت للحد الأقصى: ١٠ فئات في الجولة."); return; }
+    const id = `custom_${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+    const category = { id, label, icon: "✦" };
+    setSettings((current) => current ? { ...current, categories: [...current.categories, id], custom_categories: [...(current.custom_categories ?? []), category] } : current);
+    setNewCategory("");
+  };
 
   const finishMyRound = async () => {
     if (!supabase || !currentRound) return;
@@ -217,7 +262,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
         <div className="top-actions">
           <button className="icon-btn" onClick={async () => { if (dark) { document.documentElement.dataset.theme = "light"; localStorage.setItem("bus-dark", "false"); } else { document.documentElement.dataset.theme = "dark"; localStorage.setItem("bus-dark", "true"); } setDark(!dark); }} aria-label="تغيير المظهر">{dark ? <Sun /> : <Moon />}</button>
           <button className="icon-btn" onClick={onToggleSound} aria-label={sound ? "إيقاف الصوت" : "تشغيل الصوت"}>{sound ? <Volume2 /> : <VolumeX />}</button>
-          <button className="icon-btn" onClick={async () => { try { await rpc("leave_room", { p_room_id: roomId }); } catch { /* leaving should still return to the home screen */ } onExit(); }} aria-label="مغادرة الغرفة"><LogOut /></button>
+          <button className="icon-btn" onClick={onExit} aria-label="مغادرة الغرفة"><LogOut /></button>
           <div className="room-code">{roomCode}<button onClick={() => void copyInvite()} title="نسخ رابط الدعوة"><Copy /></button></div>
         </div>
       </header>
@@ -232,7 +277,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
                 <PlayerAvatar className="avatar-large" value={player.avatar} /><div className="player-meta"><strong>{player.display_name}{player.user_id === state.room.host_id ? " · المضيف" : ""}</strong><small>{player.is_connected ? <><i className="online-dot" />متصل الآن</> : <><WifiOff size={11} style={{ verticalAlign: "-2px", marginInlineEnd: 4 }} />غير متصل · يحتفظ بنقاطه</>}</small></div>
                 <span className={`status-badge ${player.is_ready ? "status-ready" : "status-wait"}`}>{player.is_ready ? "جاهز" : "بانتظار الاستعداد"}</span>
               </div>)}</div>
-              <div className="ready-row"><div className="ready-copy"><strong>{everyoneReady ? "كلكم جاهزين!" : "مستنيين بقية الفريق"}</strong><small>شارك رابط الغرفة عشان تلعبوا مع بعض.</small></div><div className="button-row"><button className="btn btn-light btn-quiet" onClick={() => void copyInvite()}><Copy /> نسخ الدعوة</button><button className={`btn ${me.is_ready ? "btn-light" : "btn-primary"} btn-quiet`} onClick={() => void rpc("toggle_ready", { p_room_id: roomId }).catch((cause) => notify(getError(cause)))}><Check /> {me.is_ready ? "إلغاء الاستعداد" : "أنا جاهز"}</button></div></div>
+              <div className="ready-row"><div className="ready-copy"><strong>{everyoneReady ? "كلكم جاهزين!" : "مستنيين بقية الفريق"}</strong><small>شارك رابط الغرفة عشان تلعبوا مع بعض.</small></div><div className="button-row"><button className="btn btn-light btn-quiet" onClick={() => void shareInvite()}><Share2 /> مشاركة الدعوة</button><button className={`btn ${me.is_ready ? "btn-light" : "btn-primary"} btn-quiet`} onClick={() => void rpc("toggle_ready", { p_room_id: roomId }).catch((cause) => notify(getError(cause)))}><Check /> {me.is_ready ? "إلغاء الاستعداد" : "أنا جاهز"}</button></div></div>
             </section>
 
             <section className="room-card">
@@ -240,7 +285,9 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
               <div className="setting-block"><span className="setting-title">عدد الجولات</span><div className="setting-options">{[1,2,3,5,7,10].map((count) => <button key={count} disabled={!isHost} className={`choice-chip ${settings.round_count === count ? "selected" : ""}`} onClick={() => updateSetting({ round_count: count })}>{count === 1 ? "جولة واحدة" : count === 2 ? "جولتان" : `${count} جولات`}</button>)}</div></div>
               <div className="letter-turn-note">في كل جولة، يختار لاعب مختلف الحرف. يبدأ منشئ الغرفة، وبعده اللاعب التالي.</div>
               <div className="setting-block"><label className="category-option setting-title"><input type="checkbox" checked={settings.difficult_enabled} disabled={!isHost} onChange={(event) => updateSetting({ difficult_enabled: event.target.checked })} /> السماح بالحروف الصعبة</label></div>
-              <div className="setting-block"><span className="setting-title">الفئات</span><div className="setting-options">{CATEGORIES.map((category) => <button key={category.id} disabled={!isHost} className={`choice-chip category-option ${settings.categories.includes(category.id) ? "selected" : ""}`} onClick={() => toggleCategory(category.id)}><b>{category.icon}</b>{category.label}</button>)}</div></div>
+              <div className="setting-block"><span className="setting-title">الفئات · {settings.categories.length} من ١٠</span><div className="setting-options">{categoryOptions.map((category) => <button key={category.id} disabled={!isHost} className={`choice-chip category-option ${settings.categories.includes(category.id) ? "selected" : ""}`} onClick={() => toggleCategory(category.id)}><b>{category.icon}</b>{category.label}</button>)}</div>
+                {isHost && <div className="custom-category-entry"><input className="text-field" maxLength={20} value={newCategory} onChange={(event) => setNewCategory(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomCategory(); } }} placeholder="أضف فئة من اختيارك، مثل: أكلة" aria-label="اسم الفئة الجديدة" /><button className="btn btn-light btn-quiet" disabled={settings.categories.length >= 10 || newCategory.trim().length < 2} onClick={addCustomCategory}><Plus /> إضافة فئة</button></div>}
+              </div>
               {isHost && <button className="btn btn-light btn-quiet" style={{ width: "100%", marginTop: 5 }} onClick={() => void rpc("update_room_settings", { p_room_id: roomId, p_settings: settings }, "تم حفظ إعدادات المباراة.").catch((cause) => notify(getError(cause)))}><CheckCheck /> حفظ الإعدادات</button>}
               {isHost && <button className="btn btn-primary" style={{ width: "100%", marginTop: 10 }} disabled={state.players.length < 2 || !everyoneReady} onClick={() => void startGame()}><BusFront /> ابدأ المباراة <ArrowLeft /></button>}
               {isHost && state.players.length < 2 && <div className="tiny-label" style={{ textAlign: "center", marginTop: 9 }}>تحتاج لاعبًا آخر على الأقل قبل البدء.</div>}
@@ -268,7 +315,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
           <div className="game-topline"><span className="round-count-label">جولة {currentRound.number} <span style={{ color: "var(--muted)", fontWeight: 500 }}>من {state.room.settings.round_count}</span></span><div className="letter-hero"><small>الحرف المطلوب</small><motion.strong key={currentRound.letter} initial={motionEnabled ? { scale: .7, rotate: -11 } : false} animate={{ scale: 1, rotate: 0 }} transition={motionEnabled ? { type: "spring", stiffness: 210, damping: 13 } : { duration: 0 }}>{currentRound.letter}</motion.strong></div></div>
           <div className="game-body">
             <div className="room-card">
-              <div className="answer-grid">{state.room.settings.categories.map((categoryId) => { const category = CATEGORIES.find((item) => item.id === categoryId)!; const value = values[categoryId] ?? ""; const invalid = Boolean(value.trim() && !answerStartsWithLetter(value, currentRound.letter)); return <div className={`answer-field ${value.trim() ? "filled" : ""} ${invalid ? "invalid" : ""}`} key={categoryId}>
+              <div className="answer-grid">{state.room.settings.categories.map((categoryId) => { const category = getCategory(categoryId, state.room.settings.custom_categories); if (!category) return null; const value = values[categoryId] ?? ""; const invalid = Boolean(value.trim() && !answerStartsWithLetter(value, currentRound.letter)); return <div className={`answer-field ${value.trim() ? "filled" : ""} ${invalid ? "invalid" : ""}`} key={categoryId}>
                 <label><span className="category-icon">{category.icon}</span>{category.label}</label>{values[categoryId]?.trim() && <span className="answer-check"><Check /></span>}
                 <input disabled={locked || submitting} aria-label={category.label} value={values[categoryId] ?? ""} maxLength={80} placeholder={`اكتب ${category.label}...`} onChange={(event) => setValues((current) => ({ ...current, [categoryId]: event.target.value }))} />
               </div>; })}</div>
@@ -296,10 +343,15 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
               </div>
               <div className="review-answer-list">
                 {state.room.settings.categories.map((categoryId, index) => {
-                  const category = CATEGORIES.find((item) => item.id === categoryId)!;
+                  const category = getCategory(categoryId, state.room.settings.custom_categories);
+                  if (!category) return null;
                   const value = reviewAnswer?.values?.[categoryId]?.trim() ?? "";
                   const points = reviewAnswer?.scores?.[categoryId] ?? 0;
                   const canVote = shownRound.status === "review" && Boolean(value) && reviewPlayer.id !== me.id;
+                  const categoryVotes = state.votes.filter((vote) => vote.round_id === shownRound.id && vote.answer_player_id === reviewPlayer.id && vote.category === categoryId);
+                  const myVote = categoryVotes.find((vote) => vote.voter_id === me.id);
+                  const voteThreshold = Math.max(1, Math.ceil((state.players.length - 1) * .6));
+                  const resultOverride = reviewAnswer?.overrides?.[categoryId];
                   return <motion.div className="review-answer-row" key={categoryId} initial={motionEnabled ? { opacity: 0, y: 10 } : false} animate={{ opacity: 1, y: 0 }} transition={{ delay: motionEnabled ? index * .045 : 0 }}>
                     <span className="category-icon">{category.icon}</span><strong className="review-category-name">{category.label}</strong>
                     <span className={`review-answer-text ${value ? "" : "blank-answer"}`}>{value || "لم يكتب إجابة"}</span>
@@ -308,8 +360,11 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
                       <motion.button className="vote-yes" whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="اعتماد الإجابة" onClick={() => void rpc("host_set_answer_valid", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_valid: true }, "تم اعتماد الإجابة وتحديث النقاط.").catch((cause) => notify(getError(cause)))}><Check /> صحيح</motion.button>
                       <motion.button className="vote-no" whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="رفض الإجابة" onClick={() => void rpc("host_set_answer_valid", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_valid: false }, "تم رفض الإجابة وتحديث النقاط.").catch((cause) => notify(getError(cause)))}><X /> خطأ</motion.button>
                     </> : <>
-                      <motion.button className="vote-yes" whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="أوافق على الإجابة" onClick={() => void rpc("cast_answer_vote", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_accepted: true }, "وصل تصويتك.").catch((cause) => notify(getError(cause)))}><Check /> أوافق</motion.button>
-                      <motion.button className="vote-no" whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="لا أوافق على الإجابة" onClick={() => void rpc("cast_answer_vote", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_accepted: false }, "وصل تصويتك.").catch((cause) => notify(getError(cause)))}><X /> لا أوافق</motion.button>
+                      <div className="review-vote-box">
+                        <div className="vote-progress"><strong>{resultOverride === undefined ? `${categoryVotes.length} / ${voteThreshold} أصوات` : resultOverride ? "الإجابة مقبولة" : "الإجابة مرفوضة"}</strong><small>{myVote ? myVote.accepted ? "صوّتَّ بالموافقة" : "صوّتَّ بالرفض" : "صوّت على الإجابة"}</small></div>
+                        <motion.button className={`vote-yes ${myVote?.accepted ? "voted" : ""}`} whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="أوافق على الإجابة" onClick={() => void rpc("cast_answer_vote", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_accepted: true }, "وصل تصويتك.").catch((cause) => notify(getError(cause)))}><Check /> أوافق</motion.button>
+                        <motion.button className={`vote-no ${myVote?.accepted === false ? "voted" : ""}`} whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="لا أوافق على الإجابة" onClick={() => void rpc("cast_answer_vote", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_accepted: false }, "وصل تصويتك.").catch((cause) => notify(getError(cause)))}><X /> لا أوافق</motion.button>
+                      </div>
                     </>}</div>}
                   </motion.div>;
                 })}
@@ -325,11 +380,17 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
 
         {mainState === "finished" && state && <motion.div key="finished" className="room-card" initial={false} animate={{ opacity: 1, scale: 1 }} transition={{ duration: motionEnabled ? .2 : 0 }}>
           <div className="confetti-layer" aria-hidden="true">{Array.from({ length: 48 }, (_, index) => <i className="confetti" key={index} style={{ left: `${(index * 37) % 100}%`, animationDelay: `${(index % 9) * -.42}s`, animationDuration: `${3 + index % 4}s` }} />)}</div>
-          <div className="champion"><motion.div className="champion-crown" initial={motionEnabled ? { opacity: 0, y: -25, scale: .45, rotate: -18 } : false} animate={motionEnabled ? { opacity: 1, y: [0, -7, 0], scale: 1, rotate: 0 } : { opacity: 1, scale: 1, rotate: 0 }} transition={{ duration: .8, delay: .12 }}>🏆</motion.div><div className="section-kicker">انتهت المباراة</div><motion.h1 initial={motionEnabled ? { opacity: 0, y: 15, scale: .94 } : false} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 180, damping: 16, delay: motionEnabled ? .22 : 0 }}>{rankedPlayers[0]?.display_name} هو الفائز!</motion.h1><p>إليك الترتيب النهائي ونقاط كل لاعب.</p>
+          <div className="champion"><motion.div className="champion-crown" initial={motionEnabled ? { opacity: 0, y: -25, scale: .45, rotate: -18 } : false} animate={motionEnabled ? { opacity: 1, y: [0, -7, 0], scale: 1, rotate: 0 } : { opacity: 1, scale: 1, rotate: 0 }} transition={{ duration: .8, delay: .12 }}>🏆</motion.div><div className="section-kicker">انتهت المباراة</div><motion.h1 initial={motionEnabled ? { opacity: 0, y: 15, scale: .94 } : false} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 180, damping: 16, delay: motionEnabled ? .22 : 0 }}>{matchChampions.length > 1 ? "تعادل الأبطال!" : `${rankedPlayers[0]?.display_name} هو الفائز!`}</motion.h1><p>إليك الترتيب النهائي ونقاط كل لاعب.</p>
             <div className="podium">{rankedPlayers.slice(0,3).map((player,index) => <motion.div className={`podium-place ${index===0?"first":index===1?"second":"third"}`} key={player.id} initial={motionEnabled ? { opacity: 0, y: 28, scale: .9 } : false} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 170, damping: 16, delay: motionEnabled ? .32 + index * .13 : 0 }}><PlayerAvatar className="podium-avatar" value={player.avatar} /><b>{player.display_name}</b><small>{player.total_score} نقطة</small></motion.div>)}</div>
             <p className="champion-chant">استر يا دولي!</p>
           </div>
-          <div className="room-card" style={{ padding: 0, boxShadow: "none" }}>{rankedPlayers.map((player,index) => <div className="rank-row" key={player.id}><b>{index+1}</b><PlayerAvatar className="avatar-large" value={player.avatar} /><span>{player.display_name}</span><strong>{player.total_score} نقطة</strong></div>)}</div>
+          <section className="achievement-panel"><div className="subhead"><h2>إنجازاتكم في الغرفة</h2><small>تتراكم مع كل مباراة جديدة</small></div><div className="achievement-grid">
+            <article className="achievement-card"><span>🏆 أكثر فوزًا</span><strong>{(roomWinsLeader?.wins ?? 0) > 0 ? roomWinsLeader?.display_name : "لسه مفيش فائز"}</strong><small>{roomWinsLeader?.wins ?? 0} فوز · {roomWinsLeader?.matches_played ?? 0} مباراة</small></article>
+            <article className="achievement-card"><span>🔥 أطول سلسلة انتصارات</span><strong>{(streakLeader?.best_win_streak ?? 0) > 0 ? streakLeader?.display_name : "ابدأوا أول مباراة"}</strong><small>أفضل سلسلة: {streakLeader?.best_win_streak ?? 0}</small></article>
+            <article className="achievement-card"><span>✍️ إجابات فريدة في المباراة</span><strong>{uniqueAnswerLeader ? uniqueAnswerLeader.display_name : "—"}</strong><small>{uniqueAnswerLeader ? currentMatchUniqueAnswers(uniqueAnswerLeader.id) : 0} إجابة فريدة</small></article>
+            <article className="achievement-card"><span>🚌 أسرع أتوبيس مكتمل</span><strong>{fastestLeader?.display_name ?? "لسه مفيش رقم"}</strong><small>{formatRecordTime(fastestLeader?.fastest_bus_ms)}</small></article>
+          </div></section>
+          <div className="room-card" style={{ padding: 0, boxShadow: "none" }}>{rankedPlayers.map((player,index) => <div className="rank-row" key={player.id}><b>{index+1}</b><PlayerAvatar className="avatar-large" value={player.avatar} /><div className="rank-player-details"><span>{player.display_name}</span><small>{player.wins ?? 0} فوز · {player.bus_completes ?? 0} أتوبيس مكتمل</small></div><strong>{player.total_score} نقطة</strong></div>)}</div>
           <div className="button-row" style={{ justifyContent: "center", marginTop: 20 }}><button className="btn btn-primary" disabled={!isHost} onClick={() => void rpc("restart_match", { p_room_id: roomId }, "جهزنا غرفة جديدة بنفس اللاعبين.").then(() => setSelectedRound(null)).catch((cause) => notify(getError(cause)))}><RotateCcw /> العبوا مرة تانية</button><button className="btn btn-light" onClick={onExit}>العودة للرئيسية</button></div>
           {!isHost && <div className="tiny-label" style={{ textAlign: "center", marginTop: 10 }}>المضيف يقدر يعيد المباراة بنفس اللاعبين.</div>}
         </motion.div>}

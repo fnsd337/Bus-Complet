@@ -7,16 +7,28 @@ export const CATEGORIES = [
   { id: "country", label: "دولة", icon: "⌖" }
 ] as const;
 
-export type CategoryId = (typeof CATEGORIES)[number]["id"];
+export type CategoryId = string;
+export type GameCategory = { id: CategoryId; label: string; icon: string };
+export type CustomCategory = GameCategory;
 export type Settings = {
   round_count: number;
   categories: CategoryId[];
+  custom_categories?: CustomCategory[];
   difficult_enabled: boolean;
 };
 export type Room = { id: string; code: string; host_id: string; status: "lobby" | "playing" | "finished"; closed_at?: string | null; settings: Settings; current_round: number };
-export type Player = { id: string; user_id: string; display_name: string; avatar: string; is_ready: boolean; is_connected: boolean; total_score: number; round_score: number; joined_at: string };
+export type Player = {
+  id: string; user_id: string; display_name: string; avatar: string; is_ready: boolean; is_connected: boolean;
+  total_score: number; round_score: number; joined_at: string; matches_played?: number; wins?: number;
+  win_streak?: number; best_win_streak?: number; bus_completes?: number; fastest_bus_ms?: number | null;
+};
 export type Round = { id: string; room_id: string; number: number; letter: string; status: "choosing" | "active" | "review" | "completed"; picker_user_id: string | null; started_at: string; ends_at: string; duration_seconds: number };
-export type Answer = { id: string; round_id: string; player_id: string; values: Partial<Record<CategoryId, string>>; scores: Partial<Record<CategoryId, number>>; overrides?: Partial<Record<CategoryId, boolean>>; total_points: number; locked_at: string | null };
+export type Answer = { id: string; round_id: string; player_id: string; values: Partial<Record<CategoryId, string>>; scores: Partial<Record<CategoryId, number>>; overrides?: Partial<Record<CategoryId, boolean>>; total_points: number; locked_at: string | null; submitted_at?: string | null };
+export type AnswerVote = { id: string; round_id: string; answer_player_id: string; category: CategoryId; voter_id: string; accepted: boolean };
+
+export function getCategory(categoryId: CategoryId, customCategories: readonly CustomCategory[] = []): GameCategory | undefined {
+  return CATEGORIES.find((category) => category.id === categoryId) ?? customCategories.find((category) => category.id === categoryId);
+}
 
 /** Normalizes Arabic writing differences for matching and first-letter checks. */
 export function normalizeArabic(value: string): string {
@@ -68,5 +80,6 @@ export const ARABIC_LETTERS = ["ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "
 export const DEFAULT_SETTINGS: Settings = {
   round_count: 5,
   categories: CATEGORIES.map((category) => category.id),
+  custom_categories: [],
   difficult_enabled: true
 };

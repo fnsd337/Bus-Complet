@@ -175,6 +175,8 @@ a { color: inherit; text-decoration: none; }
 .letter-turn-note { margin-top:13px;padding:11px 13px;border:1px dashed var(--line);border-radius:12px;background:var(--paper);color:var(--muted);font-size:11px;line-height:1.7; }
 .category-option { display:inline-flex;align-items:center;gap:6px; }
 .category-option b { font-weight:700; }
+.custom-category-entry { display:flex;align-items:center;gap:8px;margin-top:10px; }
+.custom-category-entry .text-field { min-width:0;flex:1; }
 .ready-row { display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid var(--line);margin-top:20px;padding-top:18px; }
 .ready-copy strong { display:block;font-size:12px; }
 .ready-copy small { display:block;color:var(--muted);font-size:10px;margin-top:4px; }
@@ -240,10 +242,16 @@ a { color: inherit; text-decoration: none; }
 .review-answer-text { min-width:0;font-size:13px;font-weight:800;overflow-wrap:anywhere; }
 .review-points { color:var(--forest);font-size:11px;font-weight:900;white-space:nowrap; }
 .review-vote-actions { display:flex;gap:6px; }
+.review-vote-box { display:flex;align-items:center;gap:6px; }
+.vote-progress { min-width:82px;color:var(--muted);font-size:9px;text-align:center; }
+.vote-progress strong,.vote-progress small { display:block; }
+.vote-progress strong { color:var(--ink);font-size:9px; }
+.vote-progress small { margin-top:3px;white-space:nowrap; }
 .review-vote-actions button { display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:32px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;font-size:10px;font-weight:800; }
 .review-vote-actions button svg { width:13px;height:13px; }
 .review-vote-actions .vote-yes { background:#e1f2e7;color:#28734c;border-color:#abd5b8; }
 .review-vote-actions .vote-no { background:#fff0eb;color:#ae4b3a;border-color:#efbdaf; }
+.review-vote-actions button.voted { outline:2px solid var(--forest);outline-offset:1px; }
 .results-letter { display:flex;align-items:center;gap:12px; }
 .results-letter strong { display:grid;place-items:center;width:50px;height:50px;border-radius:16px;background:var(--mint);color:var(--forest);font-size:29px; }
 .results-letter div b { display:block;font-size:15px; }
@@ -289,8 +297,18 @@ a { color: inherit; text-decoration: none; }
 .rank-row:last-child { border-bottom:0; }
 .rank-row > b { width:22px;color:var(--muted); }
 .rank-row .avatar-large { width:31px;height:31px;border-radius:10px;font-size:16px; }
-.rank-row > span:nth-last-child(2) { flex:1; }
+.rank-player-details { flex:1;min-width:0; }
+.rank-player-details span,.rank-player-details small { display:block; }
+.rank-player-details span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.rank-player-details small { margin-top:3px;color:var(--muted);font-size:9px; }
 .rank-row strong { color:var(--forest); }
+.achievement-panel { margin:4px 0 17px;padding:18px;border:1.5px solid var(--ink);border-radius:16px;background:var(--paper); }
+.achievement-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px; }
+.achievement-card { min-width:0;padding:13px 11px;border:1px solid var(--line);border-radius:13px;background:var(--surface); }
+.achievement-card span,.achievement-card strong,.achievement-card small { display:block; }
+.achievement-card span { color:var(--muted);font-size:10px;font-weight:800; }
+.achievement-card strong { overflow:hidden;margin-top:8px;color:var(--forest);font-size:13px;text-overflow:ellipsis;white-space:nowrap; }
+.achievement-card small { margin-top:5px;color:var(--muted);font-size:9px; }
 
 @keyframes spin { to { transform:rotate(360deg); } }
 @keyframes float { 0%,100% { translate:0 0; } 50% { translate:0 -8px; } }
@@ -398,7 +416,10 @@ a { color: inherit; text-decoration: none; }
   .review-answer-text { grid-column:2;grid-row:2;font-size:12px; }
   .review-points { grid-column:3;grid-row:1 / span 2;font-size:10px; }
   .review-vote-actions { grid-column:2 / -1; }
-  .review-vote-actions button { flex:1; }
+  .review-vote-box { flex-wrap:wrap; }
+  .review-vote-box button { flex:1; }
+  .vote-progress { width:100%; }
+  .achievement-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .scoreboard { grid-template-columns:repeat(2,1fr);gap:7px; }
   .score-card { padding:10px 8px;gap:6px; }
   .score-card .avatar-large { width:29px;height:29px;font-size:15px; }
