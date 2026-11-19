@@ -1,14 +1,32 @@
 "use client";
 
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { ArrowLeft, BusFront, Clock3, DoorOpen, Moon, Play, Sparkles, Sun, UsersRound, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowLeft, BusFront, Camera, Clock3, DoorOpen, Moon, Play, Sparkles, Sun, UsersRound, Volume2, VolumeX, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import GameRoom from "@/components/game-room";
+import PlayerAvatar from "@/components/player-avatar";
 import { AVATARS } from "@/lib/game";
 import { ensureUser, getSupabase } from "@/lib/supabase";
 
 type RoomEntry = { id: string; code: string };
 type ModalKind = "create" | "join" | null;
+
+async function compressAvatar(file: File): Promise<Blob> {
+  const source = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+    const scale = Math.min(1, 384 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", .82));
+    if (!blob) throw new Error("تعذر تجهيز الصورة. جرّب صورة تانية.");
+    return blob;
+  } finally { URL.revokeObjectURL(source); }
+}
 
 function playTone(enabled: boolean, frequency = 520) {
   if (!enabled || typeof window === "undefined") return;
@@ -157,13 +175,21 @@ export default function HomePage() {
 function EntryDialog({ kind, code, onClose, onEnter, ready, sound, motionEnabled }: { kind: Exclude<ModalKind, null>; code: string; onClose: () => void; onEnter: (entry: RoomEntry) => void; ready: boolean; sound: boolean; motionEnabled: boolean }) {
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState(AVATARS[0]);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [roomCode, setRoomCode] = useState(code);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const supabase = getSupabase();
+  const hasSavedPhoto = /^https?:\/\//i.test(avatar);
+
+  useEffect(() => () => { if (avatar.startsWith("blob:")) URL.revokeObjectURL(avatar); }, [avatar]);
 
   useEffect(() => { setRoomCode(code); }, [code]);
-  useEffect(() => { setName(localStorage.getItem("bus-name") ?? ""); }, []);
+  useEffect(() => {
+    setName(localStorage.getItem("bus-name") ?? "");
+    const savedAvatar = localStorage.getItem("bus-avatar");
+    if (savedAvatar) setAvatar(savedAvatar);
+  }, []);
   const submit = async () => {
     setError("");
     if (!name.trim()) { setError("اكتب اسمك الأول عشان أصحابك يعرفوك."); return; }
@@ -171,15 +197,24 @@ function EntryDialog({ kind, code, onClose, onEnter, ready, sound, motionEnabled
     if (!supabase || !ready) { setError("الاتصال أونلاين غير مُعد بعد. أضف مفاتيح Supabase في ملف .env.local واتبع خطوات الإعداد في README."); return; }
     setBusy(true);
     try {
-      await ensureUser();
+      const user = await ensureUser();
+      let selectedAvatar = avatar;
+      if (avatarFile) {
+        const photo = await compressAvatar(avatarFile);
+        const path = `${user.id}/${crypto.randomUUID()}.webp`;
+        const { error: uploadError } = await supabase.storage.from("player-avatars").upload(path, photo, { contentType: "image/webp", upsert: false });
+        if (uploadError) throw new Error("تعذر رفع صورة الحساب. تأكد من تشغيل تحديث Supabase الأخير.");
+        selectedAvatar = supabase.storage.from("player-avatars").getPublicUrl(path).data.publicUrl;
+      }
       const { data, error: rpcError } = kind === "create"
-        ? await supabase.rpc("create_room", { p_name: name.trim(), p_avatar: avatar })
-        : await supabase.rpc("join_room", { p_code: roomCode.trim().toUpperCase(), p_name: name.trim(), p_avatar: avatar });
+        ? await supabase.rpc("create_room", { p_name: name.trim(), p_avatar: selectedAvatar })
+        : await supabase.rpc("join_room", { p_code: roomCode.trim().toUpperCase(), p_name: name.trim(), p_avatar: selectedAvatar });
       if (rpcError) throw new Error(rpcError.message);
       const result = data as { id?: string; room_id?: string; code: string };
       const resultId = result.id ?? result.room_id;
       if (!resultId) throw new Error("لم يرجع الخادم بيانات الغرفة.");
       localStorage.setItem("bus-name", name.trim());
+      localStorage.setItem("bus-avatar", selectedAvatar);
       playTone(sound, 600);
       onEnter({ id: resultId, code: result.code });
     } catch (cause) {
@@ -194,7 +229,16 @@ function EntryDialog({ kind, code, onClose, onEnter, ready, sound, motionEnabled
       {!ready && <div className="connection-note"><Clock3 /> <span>اللعب أونلاين يحتاج إعداد Supabase مرة واحدة. الواجهة جاهزة، ولن ننشئ غرفة محلية وهمية.</span></div>}
       <div className="form-group"><label className="field-label" htmlFor="player-name">اسمك المستعار</label><input id="player-name" className="text-field" maxLength={24} placeholder="مثال: مريم" value={name} onChange={(event) => setName(event.target.value)} autoFocus /></div>
       {kind === "join" && <div className="form-group"><label className="field-label" htmlFor="room-code">كود الغرفة</label><input id="room-code" className="text-field" dir="ltr" style={{ letterSpacing: ".18em", fontWeight: 900 }} maxLength={6} placeholder="ABC123" value={roomCode} onChange={(event) => setRoomCode(event.target.value.toUpperCase())} /></div>}
-      <div className="form-group"><span className="field-label">اختار صورتك</span><div className="avatar-picker">{AVATARS.map((item) => <button type="button" className={`avatar-option ${avatar === item ? "active" : ""}`} key={item} onClick={() => setAvatar(item)} aria-label={`الصورة ${item}`}>{item}</button>)}</div></div>
+      <div className="form-group"><span className="field-label">اختار صورتك</span>
+        <label className={`avatar-upload ${avatarFile || hasSavedPhoto ? "active" : ""}`} htmlFor="avatar-photo"><Camera size={17} /><span>{avatarFile || hasSavedPhoto ? "صورتك الحالية" : "اختار صورة من جهازك"}</span>{(avatarFile || hasSavedPhoto) && <PlayerAvatar value={avatar} className="avatar-option-preview" />}</label>
+        <input className="avatar-file-input" id="avatar-photo" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          if (file.size > 5 * 1024 * 1024) { setError("اختار صورة حجمها أقل من ٥ ميجابايت."); event.target.value = ""; return; }
+          setError(""); setAvatarFile(file); setAvatar(URL.createObjectURL(file));
+        }} />
+        <div className="avatar-picker">{AVATARS.map((item) => <button type="button" className={`avatar-option ${!avatarFile && avatar === item ? "active" : ""}`} key={item} onClick={() => { setAvatarFile(null); setAvatar(item); }} aria-label={`الصورة ${item}`}><PlayerAvatar value={item} /></button>)}</div>
+      </div>
       {error && <div className="modal-error">{error}</div>}
       <button className="btn btn-primary" onClick={() => void submit()} disabled={busy}>{busy ? "لحظة واحدة..." : kind === "create" ? <><UsersRound /> إنشاء الغرفة <ArrowLeft /></> : <><DoorOpen /> انضم للغرفة <ArrowLeft /></>}</button>
     </motion.section>

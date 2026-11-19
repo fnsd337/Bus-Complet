@@ -10,14 +10,12 @@ export const CATEGORIES = [
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
 export type Settings = {
   round_count: number;
-  letter_mode: "random" | "host";
   categories: CategoryId[];
   difficult_enabled: boolean;
-  selected_letter: string | null;
 };
-export type Room = { id: string; code: string; host_id: string; status: "lobby" | "playing" | "finished"; settings: Settings; current_round: number };
+export type Room = { id: string; code: string; host_id: string; status: "lobby" | "playing" | "finished"; closed_at?: string | null; settings: Settings; current_round: number };
 export type Player = { id: string; user_id: string; display_name: string; avatar: string; is_ready: boolean; is_connected: boolean; total_score: number; round_score: number; joined_at: string };
-export type Round = { id: string; room_id: string; number: number; letter: string; status: "active" | "review" | "completed"; started_at: string; ends_at: string; duration_seconds: number };
+export type Round = { id: string; room_id: string; number: number; letter: string; status: "choosing" | "active" | "review" | "completed"; picker_user_id: string | null; started_at: string; ends_at: string; duration_seconds: number };
 export type Answer = { id: string; round_id: string; player_id: string; values: Partial<Record<CategoryId, string>>; scores: Partial<Record<CategoryId, number>>; overrides?: Partial<Record<CategoryId, boolean>>; total_points: number; locked_at: string | null };
 
 /** Normalizes Arabic writing differences for matching and first-letter checks. */
@@ -64,13 +62,11 @@ export function scoreAnswers(
   return result;
 }
 
-export const AVATARS = ["🦊", "🐼", "🐧", "🐯", "🐸", "🦁", "🐙", "🦄", "🐨", "🐳"];
+export const AVATARS = ["🦊", "🐼", "🐧", "🐯", "🐸", "🦁", "🐙", "🦄", "🐨", "🐳", "🐱", "🐶", "🐰", "🐻", "🐵", "🐔", "🦉", "🦋", "🐢", "🐬", "🦈", "🐺", "🦌", "🐮", "🐷", "🐤", "🦜", "🐝", "🦔", "🦩", "🦥", "🦦", "🦭", "🦚"];
 export const ARABIC_LETTERS = ["ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل", "م", "ن", "ه", "و", "ي"];
 
 export const DEFAULT_SETTINGS: Settings = {
   round_count: 5,
-  letter_mode: "random",
   categories: CATEGORIES.map((category) => category.id),
-  difficult_enabled: true,
-  selected_letter: null
+  difficult_enabled: true
 };
