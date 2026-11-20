@@ -9,6 +9,7 @@ import {
 } from "@/lib/game";
 import PlayerAvatar from "@/components/player-avatar";
 import { ensureUser, getSupabase } from "@/lib/supabase";
+import { requestGameAi } from "@/lib/game-ai-client";
 import type { SfxCue } from "@/lib/sfx";
 
 type RoomState = { room: Room; players: Player[]; rounds: Round[]; answers: Answer[]; votes: AnswerVote[] };
@@ -20,7 +21,7 @@ const EMOJIS = ["😂", "🔥", "👏", "😎", "❤️"];
 function getError(cause: unknown) {
   if (cause instanceof Error) return cause.message;
   if (cause && typeof cause === "object" && "message" in cause) return String((cause as { message: unknown }).message);
-  return "حصل خطأ أثناء الاتصال. جرّب تاني.";
+  return "حصل خطأ أثناء الاتصال. جرّب مرة أخرى.";
 }
 
 export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSound, onToggleSound, onExit }: GameRoomProps) {
@@ -90,6 +91,9 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   const me = state?.players.find((player) => player.user_id === userId) ?? null;
   const isHost = Boolean(state && state.room.host_id === userId);
   const shownAnswers = state?.answers.filter((answer) => answer.round_id === shownRound?.id) ?? [];
+  const finishedPlayersCount = currentRound && state
+    ? state.players.filter((player) => state.answers.some((answer) => answer.round_id === currentRound.id && answer.player_id === player.id && Boolean(answer.locked_at))).length
+    : 0;
   const reviewPlayer = state?.players[reviewPlayerIndex] ?? null;
   const reviewAnswer = shownAnswers.find((answer) => answer.player_id === reviewPlayer?.id);
   const myAnswer = shownAnswers.find((answer) => answer.player_id === me?.id);
@@ -218,7 +222,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   const toggleCategory = (category: CategoryId) => setSettings((current) => {
     if (!current) return current;
     const categories = current.categories.includes(category) ? current.categories.filter((item) => item !== category) : [...current.categories, category];
-    if (categories.length > 10) { notify("اختار بحد أقصى ١٠ فئات."); return current; }
+    if (categories.length > 10) { notify("اختر ١٠ فئات بحد أقصى."); return current; }
     return categories.length ? { ...current, categories } : current;
   });
 
@@ -241,15 +245,9 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
     if (!supabase) { notify("الحكم الذكي محتاج إعداد Supabase."); return; }
     setAiBusyKey(judgeKey);
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session?.access_token) throw new Error("انتهت جلسة اللاعب. حدّث الصفحة وجرب تاني.");
-      const response = await fetch("/api/game-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ mode: "judge", letter, category: categoryLabel, answer })
+      const result = await requestGameAi<AiJudgment>({
+        mode: "judge", letter, category: categoryLabel, answer
       });
-      const result = await response.json() as AiJudgment & { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "تعذر تشغيل الحكم الذكي.");
       setAiJudgments((current) => ({ ...current, [judgeKey]: result }));
       onSound(result.verdict === "invalid" ? "reject" : "approve");
     } catch (cause) { notify(getError(cause)); }
@@ -275,8 +273,8 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
     onSound("tap");
   };
 
-  if (loading) return <div className="wrap"><div className="loading-panel"><div><div className="spinner" /> بنجهز الغرفة...</div></div></div>;
-  if (error || !state || !me) return <div className="wrap"><section className="room-card error-card"><div className="brand-mark" style={{ margin: "0 auto 16px" }}><WifiOff /></div><h2>مش قادرين نوصل للغرفة</h2><p>{error || "الغرفة غير موجودة، أو إنك مش عضو فيها."}</p><div className="button-row" style={{ justifyContent: "center" }}><button className="btn btn-light" onClick={onExit}><ArrowRight /> العودة للرئيسية</button><button className="btn btn-primary" onClick={() => { setError(""); setLoading(true); void refresh().catch((cause) => setError(getError(cause))).finally(() => setLoading(false)); }}>حاول تاني</button></div></section></div>;
+  if (loading) return <div className="wrap"><div className="loading-panel"><div><div className="spinner" /> بنجهّز الغرفة...</div></div></div>;
+  if (error || !state || !me) return <div className="wrap"><section className="room-card error-card"><div className="brand-mark" style={{ margin: "0 auto 16px" }}><WifiOff /></div><h2>مش قادرين نوصل للغرفة</h2><p>{error || "الغرفة غير موجودة، أو إنك مش عضو فيها."}</p><div className="button-row" style={{ justifyContent: "center" }}><button className="btn btn-light" onClick={onExit}><ArrowRight /> العودة للرئيسية</button><button className="btn btn-primary" onClick={() => { setError(""); setLoading(true); void refresh().catch((cause) => setError(getError(cause))).finally(() => setLoading(false)); }}>حاول مرة أخرى</button></div></section></div>;
 
   const viewingOtherRound = selectedRound !== null && selectedRound !== state.room.current_round;
   const mainState = state.room.closed_at && selectedRound === null ? "closed"
@@ -289,7 +287,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   return <section className="room-page">
     <div className="wrap">
       <header className="room-top">
-        <div className="room-headline"><span className="brand-mark"><BusFront /></span><div><h1>{mainState === "closed" ? "الغرفة مقفولة" : mainState === "lobby" ? "غرفة الانتظار" : mainState === "choosing" ? `اختيار حرف الجولة ${state.room.current_round}` : mainState === "playing" ? `الجولة ${state.room.current_round} من ${state.room.settings.round_count}` : mainState === "finished" ? "النتيجة النهائية" : "مراجعة الإجابات"}</h1><p>{mainState === "closed" ? "خرج كل اللاعبين من الغرفة، واحتفظنا بنتائج المباراة." : mainState === "lobby" ? "لما الكل يستعد، المضيف يبدأ اللعبة." : mainState === "choosing" ? "اختيار الحروف يدور بينكم، بدءًا بمنشئ الغرفة." : mainState === "playing" ? "كمّلوا الخانات، وأول لاعب يعلن أتوبيس كومبليت يقفل الجولة على الكل." : "النتائج بتتحدث عند كل اللاعبين."}</p></div></div>
+        <div className="room-headline"><span className="brand-mark"><BusFront /></span><div><h1>{mainState === "closed" ? "الغرفة مقفولة" : mainState === "lobby" ? "غرفة الانتظار" : mainState === "choosing" ? `اختيار حرف الجولة ${state.room.current_round}` : mainState === "playing" ? `الجولة ${state.room.current_round} من ${state.room.settings.round_count}` : mainState === "finished" ? "النتيجة النهائية" : "مراجعة الإجابات"}</h1><p>{mainState === "closed" ? "خرج كل اللاعبين من الغرفة، واحتفظنا بنتائج المباراة." : mainState === "lobby" ? "بعد ما الكل يبقى جاهز، المضيف يبدأ اللعبة." : mainState === "choosing" ? "يتناوب اللاعبون على اختيار الحرف، ويبدأ منشئ الغرفة." : mainState === "playing" ? "كمّلوا الخانات؛ أول لاعب يعلن أتوبيس كومبليت يقفل الجولة عند الكل." : "النتائج بتتحدّث عند كل اللاعبين."}</p></div></div>
         <div className="top-actions">
           <button className="icon-btn" onClick={async () => { if (dark) { document.documentElement.dataset.theme = "light"; localStorage.setItem("bus-dark", "false"); } else { document.documentElement.dataset.theme = "dark"; localStorage.setItem("bus-dark", "true"); } setDark(!dark); }} aria-label="تغيير المظهر">{dark ? <Sun /> : <Moon />}</button>
           <button className="icon-btn" onClick={onToggleSound} aria-label={sound ? "إيقاف الصوت" : "تشغيل الصوت"}>{sound ? <Volume2 /> : <VolumeX />}</button>
@@ -303,18 +301,18 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
         {mainState === "lobby" && state && settings && <motion.div key="lobby" initial={false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -7 }} transition={{ duration: motionEnabled ? .2 : 0 }}>
           <div className="lobby-grid">
             <section className="room-card">
-              <div className="subhead"><h2>اللاعبين في الغرفة</h2><small>{state.players.length} / 10 لاعبين</small></div>
+              <div className="subhead"><h2>اللاعبون في الغرفة</h2><small>{state.players.length} / 10 لاعبين</small></div>
               <div className="player-list">{state.players.map((player) => <div className="player-row" key={player.id}>
                 <PlayerAvatar className="avatar-large" value={player.avatar} /><div className="player-meta"><strong>{player.display_name}{player.user_id === state.room.host_id ? " · المضيف" : ""}</strong><small>{player.is_connected ? <><i className="online-dot" />متصل الآن</> : <><WifiOff size={11} style={{ verticalAlign: "-2px", marginInlineEnd: 4 }} />غير متصل · يحتفظ بنقاطه</>}</small></div>
                 <span className={`status-badge ${player.is_ready ? "status-ready" : "status-wait"}`}>{player.is_ready ? "جاهز" : "بانتظار الاستعداد"}</span>
               </div>)}</div>
-              <div className="ready-row"><div className="ready-copy"><strong>{everyoneReady ? "كلكم جاهزين!" : "مستنيين بقية الفريق"}</strong><small>شارك رابط الغرفة عشان تلعبوا مع بعض.</small></div><div className="button-row"><button className="btn btn-light btn-quiet" onClick={() => void shareInvite()}><Share2 /> مشاركة الدعوة</button><button className={`btn ${me.is_ready ? "btn-light" : "btn-primary"} btn-quiet`} onClick={() => void rpc("toggle_ready", { p_room_id: roomId }).catch((cause) => notify(getError(cause)))}><Check /> {me.is_ready ? "إلغاء الاستعداد" : "أنا جاهز"}</button></div></div>
+              <div className="ready-row"><div className="ready-copy"><strong>{everyoneReady ? "كلكم جاهزين!" : "مستنيين بقية الفريق"}</strong><small>شارك رابط الغرفة عشان تلعبوا مع بعض.</small></div><div className="button-row"><button className="btn btn-light btn-quiet" onClick={() => void shareInvite()}><Share2 /> مشاركة الدعوة</button><button className={`btn ${me.is_ready ? "btn-light" : "btn-primary"} btn-quiet`} onClick={() => void rpc("toggle_ready", { p_room_id: roomId }, undefined, me.is_ready ? "tap" : "ready").catch((cause) => notify(getError(cause)))}><Check /> {me.is_ready ? "إلغاء الاستعداد" : "أنا جاهز"}</button></div></div>
             </section>
 
             <section className="room-card">
               <div className="subhead"><h2>إعدادات المباراة</h2><small>{isHost ? "للمضيف" : "يعدّلها المضيف"}</small></div>
               <div className="setting-block"><span className="setting-title">عدد الجولات</span><div className="setting-options">{[1,2,3,5,7,10].map((count) => <button key={count} disabled={!isHost} className={`choice-chip ${settings.round_count === count ? "selected" : ""}`} onClick={() => updateSetting({ round_count: count })}>{count === 1 ? "جولة واحدة" : count === 2 ? "جولتان" : `${count} جولات`}</button>)}</div></div>
-              <div className="letter-turn-note">في كل جولة، يختار لاعب مختلف الحرف. يبدأ منشئ الغرفة، وبعده اللاعب التالي.</div>
+              <div className="letter-turn-note">في كل جولة، يختار لاعب مختلف الحرف. يبدأ منشئ الغرفة، ثم يأتي دور اللاعب التالي.</div>
               <div className="setting-block"><label className="category-option setting-title"><input type="checkbox" checked={settings.difficult_enabled} disabled={!isHost} onChange={(event) => updateSetting({ difficult_enabled: event.target.checked })} /> السماح بالحروف الصعبة</label></div>
               <div className="setting-block"><span className="setting-title">الفئات · {settings.categories.length} من ١٠</span><div className="setting-options">{categoryOptions.map((category) => <button key={category.id} disabled={!isHost} className={`choice-chip category-option ${settings.categories.includes(category.id) ? "selected" : ""}`} onClick={() => toggleCategory(category.id)}><b>{category.icon}</b>{category.label}</button>)}</div>
                 {isHost && <div className="custom-category-entry"><input className="text-field" maxLength={20} value={newCategory} onChange={(event) => setNewCategory(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomCategory(); } }} placeholder="أضف فئة من اختيارك، مثل: أكلة" aria-label="اسم الفئة الجديدة" /><button className="btn btn-light btn-quiet" disabled={settings.categories.length >= 10 || newCategory.trim().length < 2} onClick={addCustomCategory}><Plus /> إضافة فئة</button></div>}
@@ -334,26 +332,26 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
             return <>
               <div className="letter-picker-person">
                 <motion.div className="letter-picker-avatar" animate={motionEnabled ? { y: [0, -8, 0], rotate: [-2, 2, -2] } : undefined} transition={{ duration: 2.4, repeat: Infinity }}><PlayerAvatar value={picker?.avatar ?? "🦊"} /></motion.div>
-                <div><span className="section-kicker">دور اختيار الحرف</span><h2>{myTurn ? "اختار حرف الجولة!" : `${picker?.display_name ?? "اللاعب"} بيختار الحرف`}</h2><p>{myTurn ? "بعد اختيارك، الجولة هتبدأ عند كل اللاعبين." : "لحظات وتبدأ الجولة الجديدة."}</p></div>
+                <div><span className="section-kicker">دور اختيار الحرف</span><h2>{myTurn ? "اختر حرف الجولة!" : `${picker?.display_name ?? "اللاعب"} يختار الحرف`}</h2><p>{myTurn ? "بعد اختيارك، ستبدأ الجولة عند جميع اللاعبين." : "لحظات وتبدأ الجولة الجديدة."}</p></div>
               </div>
               {myTurn ? <div className="letter-choice-grid">{ARABIC_LETTERS.map((letter) => <motion.button key={letter} className="letter-choice" whileHover={motionEnabled ? { y: -3, scale: 1.06 } : undefined} whileTap={{ scale: .92 }} onClick={() => void rpc("pick_round_letter", { p_room_id: roomId, p_letter: letter }, `اخترت حرف ${letter}.`, "letter").catch((cause) => notify(getError(cause)))}>{letter}</motion.button>)}</div>
-                : <div className="letter-waiting"><span className="spinner" /> {picker?.display_name ?? "اللاعب التالي"} يختار الحرف دلوقتي</div>}
+                : <div className="letter-waiting"><span className="spinner" /> {picker?.display_name ?? "اللاعب التالي"} يختار الحرف الآن</div>}
             </>;
           })()}
         </motion.div>}
 
         {mainState === "playing" && state && currentRound && <motion.div key={`play-${currentRound.id}`} initial={false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -7 }} transition={{ duration: motionEnabled ? .2 : 0 }}>
-          <div className="game-topline"><span className="round-count-label">جولة {currentRound.number} <span style={{ color: "var(--muted)", fontWeight: 500 }}>من {state.room.settings.round_count}</span></span><div className="letter-hero"><small>الحرف المطلوب</small><motion.strong key={currentRound.letter} initial={motionEnabled ? { scale: .7, rotate: -11 } : false} animate={{ scale: 1, rotate: 0 }} transition={motionEnabled ? { type: "spring", stiffness: 210, damping: 13 } : { duration: 0 }}>{currentRound.letter}</motion.strong></div></div>
+          <div className="game-topline"><span className="round-count-label">جولة {currentRound.number} <span style={{ color: "var(--muted)", fontWeight: 500 }}>من {state.room.settings.round_count}</span></span><div className="letter-hero"><small>الحرف المطلوب</small><motion.strong key={currentRound.letter} initial={motionEnabled ? { scale: .7, rotate: -11 } : false} animate={{ scale: 1, rotate: 0 }} transition={motionEnabled ? { type: "spring", stiffness: 210, damping: 13 } : { duration: 0 }}>{currentRound.letter}</motion.strong></div><span className="round-status"><CheckCheck size={15} /> {finishedPlayersCount} من {state.players.length} أكملوا</span></div>
           <div className="game-body">
             <div className="room-card">
               <div className="answer-grid">{state.room.settings.categories.map((categoryId) => { const category = getCategory(categoryId, state.room.settings.custom_categories); if (!category) return null; const value = values[categoryId] ?? ""; const invalid = Boolean(value.trim() && !answerStartsWithLetter(value, currentRound.letter)); return <div className={`answer-field ${value.trim() ? "filled" : ""} ${invalid ? "invalid" : ""}`} key={categoryId}>
                 <label><span className="category-icon">{category.icon}</span>{category.label}</label>{values[categoryId]?.trim() && <span className="answer-check"><Check /></span>}
                 <input disabled={locked || submitting} aria-label={category.label} value={values[categoryId] ?? ""} maxLength={80} placeholder={`اكتب ${category.label}...`} onChange={(event) => setValues((current) => ({ ...current, [categoryId]: event.target.value }))} />
               </div>; })}</div>
-              <div className="game-actions"><span className="save-state">{locked ? "الجولة اتقفلت" : saving ? "بيحفظ إجاباتك..." : !allCategoriesFilled ? "املأ كل الخانات لإعلان أتوبيس كومبليت" : !allAnswersStartWithLetter ? `كل إجابة لازم تبدأ بحرف ${currentRound.letter}` : saved ? "✓ إجاباتك محفوظة" : "إجاباتك جاهزة! أعلن أتوبيس كومبليت"}</span><button className="btn btn-primary" disabled={locked || submitting || !allCategoriesFilled || !allAnswersStartWithLetter} onClick={() => void finishMyRound()}>{submitting ? "بيقفل الجولة..." : <><BusFront /> أتوبيس كومبليت!</>}</button></div>
+              <div className="game-actions"><span className="save-state">{locked ? "الجولة اتقفلت" : saving ? "بيحفظ إجاباتك..." : !allCategoriesFilled ? "املأ كل الخانات لإعلان أتوبيس كومبليت" : !allAnswersStartWithLetter ? `كل إجابة لازم تكون كلمة كاملة وتبدأ بحرف ${currentRound.letter}` : saved ? "✓ إجاباتك محفوظة" : "إجاباتك جاهزة! أعلن أتوبيس كومبليت"}</span><button className="btn btn-primary" disabled={locked || submitting || !allCategoriesFilled || !allAnswersStartWithLetter} onClick={() => void finishMyRound()}>{submitting ? "بيقفل الجولة..." : <><BusFront /> أتوبيس كومبليت!</>}</button></div>
             </div>
             <aside className="game-sidebar">
-              <div className="players-mini"><h3>اللاعبين · {state.players.length}</h3>{state.players.map((player) => <div className="mini-player" key={player.id}><PlayerAvatar className="mini-avatar" value={player.avatar} /><span>{player.display_name}</span>{state.answers.find((answer) => answer.round_id === currentRound.id && answer.player_id === player.id)?.locked_at ? <Check size={14} color="#4ca579" /> : <i className={player.is_connected ? "online-dot" : ""} />}</div>)}</div>
+              <div className="players-mini"><h3>اللاعبون · {state.players.length}</h3>{state.players.map((player) => { const completed = state.answers.some((answer) => answer.round_id === currentRound.id && answer.player_id === player.id && Boolean(answer.locked_at)); return <div className="mini-player" key={player.id}><PlayerAvatar className="mini-avatar" value={player.avatar} /><span>{player.display_name}</span><small className={`mini-status ${completed ? "complete" : player.is_connected ? "playing" : "offline"}`}>{completed ? "أكمل" : player.is_connected ? "يلعب" : "غير متصل"}</small></div>; })}</div>
               <div className="reaction-card"><h3>شجّعهم بإيموجي</h3><div className="reaction-list">{EMOJIS.map((emoji) => <button className="reaction-button" key={emoji} onClick={() => void sendReaction(emoji)}>{emoji}</button>)}</div></div>
             </aside>
           </div>
@@ -362,9 +360,9 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
         {mainState === "results" && state && shownRound && reviewPlayer && <motion.div key={`results-${shownRound.id}`} initial={false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -7 }} transition={{ duration: motionEnabled ? .2 : 0 }}>
           <div className="results-header"><div className="results-letter"><strong>{shownRound.letter}</strong><div><b>{selectedRound && selectedRound !== state.room.current_round ? `نتائج الجولة ${selectedRound}` : `الجولة ${shownRound.number} خلصت!`}</b><small>راجعوا إجابات كل لاعب وصوّتوا عليها.</small></div></div><div className="tiny-label">{shownRound.status === "review" ? "المراجعة مفتوحة" : "نتائج محفوظة"}</div></div>
           <div className="review-player-nav">
-            <button className="btn btn-light btn-quiet" disabled={reviewPlayerIndex <= 0} onClick={() => setReviewPlayerIndex((index) => Math.max(0, index - 1))}><ArrowRight /> السابق</button>
+            <button className="btn btn-light btn-quiet" disabled={reviewPlayerIndex <= 0} onClick={() => { setReviewPlayerIndex((index) => Math.max(0, index - 1)); onSound("reveal"); }}><ArrowRight /> السابق</button>
             <span>{reviewPlayerIndex + 1} من {state.players.length}</span>
-            <button className="btn btn-primary btn-quiet" disabled={reviewPlayerIndex >= state.players.length - 1} onClick={() => setReviewPlayerIndex((index) => Math.min(state.players.length - 1, index + 1))}>اللاعب التالي <ArrowLeft /></button>
+            <button className="btn btn-primary btn-quiet" disabled={reviewPlayerIndex >= state.players.length - 1} onClick={() => { setReviewPlayerIndex((index) => Math.min(state.players.length - 1, index + 1)); onSound("reveal"); }}>اللاعب التالي <ArrowLeft /></button>
           </div>
           <AnimatePresence mode="wait">
             <motion.section key={reviewPlayer.id} className="room-card review-player-card" initial={motionEnabled ? { opacity: 0, y: 18, scale: .98 } : false} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -14, scale: .98 }} transition={{ duration: motionEnabled ? .22 : 0 }}>
@@ -383,9 +381,11 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
                   const myVote = categoryVotes.find((vote) => vote.voter_id === me.id);
                   const voteThreshold = Math.max(1, Math.ceil((state.players.length - 1) * .6));
                   const resultOverride = reviewAnswer?.overrides?.[categoryId];
+                  const disputed = categoryVotes.some((vote) => vote.accepted) && categoryVotes.some((vote) => !vote.accepted);
                   const judgeKey = `${shownRound.id}:${reviewPlayer.id}:${categoryId}`;
                   const judgment = aiJudgments[judgeKey];
-                  return <motion.div className="review-answer-row" key={categoryId} initial={motionEnabled ? { opacity: 0, y: 10 } : false} animate={{ opacity: 1, y: 0 }} transition={{ delay: motionEnabled ? index * .045 : 0 }}>
+                  const reviewStatus = resultOverride === true ? "review-accepted" : resultOverride === false ? "review-rejected" : disputed ? "review-disputed" : "";
+                  return <motion.div className={`review-answer-row ${reviewStatus}`} key={categoryId} initial={motionEnabled ? { opacity: 0, y: 10 } : false} animate={{ opacity: 1, y: 0 }} transition={{ delay: motionEnabled ? index * .045 : 0 }}>
                     <span className="category-icon">{category.icon}</span><strong className="review-category-name">{category.label}</strong>
                     <span className={`review-answer-text ${value ? "" : "blank-answer"}`}>{value || "لم يكتب إجابة"}</span>
                     <span className="review-points">{points} نقطة</span>

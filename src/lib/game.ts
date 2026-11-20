@@ -45,7 +45,8 @@ export function normalizeArabic(value: string): string {
 export function answerStartsWithLetter(answer: string, letter: string): boolean {
   const a = normalizeArabic(answer);
   const l = normalizeArabic(letter);
-  return a.length > 0 && l.length > 0 && a.startsWith(l);
+  // A selected letter alone is not a completed word and must never score.
+  return a.length >= 2 && l.length > 0 && a.startsWith(l);
 }
 
 export function scoreAnswers(

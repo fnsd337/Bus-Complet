@@ -68,8 +68,12 @@ function instructions(request: GameAiRequest) {
   if (request.mode === "judge") {
     return "أنت حكم مساعد في لعبة أتوبيس كومبليت عربية. قيّم هل الإجابة تناسب الفئة فعلًا، مع قبول الأسماء الشائعة والألفاظ العربية المفهومة واللهجات المصرية والعربية. لا ترفض الكلمة لمجرد اختلاف كتابتها أو ندرتها إذا كانت معقولة. حرف البداية يجري فحصه مسبقًا. إذا لم تكن متأكدًا من معنى الكلمة أو صلاحيتها فأرجع uncertain وثقة منخفضة. اكتب سببًا قصيرًا ومحترمًا بالعربية. رأيك اقتراح فقط؛ اللاعبون هم أصحاب القرار النهائي. أخرج JSON صالحًا فقط بالمفاتيح verdict وconfidence وreason، من غير نص إضافي أو علامات تنسيق.";
   }
-  const style = request.difficulty === "casual" ? "اختر إجابات مألوفة وبسيطة." : request.difficulty === "clever" ? "اختر إجابات ذكية ومتنوعة، لكن معروفة وصحيحة." : "اختر إجابات صحيحة مع لمسة مرحة من دون إجابات مختلقة.";
-  return `أنت منافس تدريب في لعبة أتوبيس كومبليت. ${style} أعد إجابة واحدة صحيحة لكل فئة مطلوبة. يجب أن تبدأ كل إجابة بالحرف المحدد حرفيًا بعد تطبيع أشكال الألف العربية. لا تكتب أسماء الفئات في نص الإجابة ولا تضف شرحًا. أخرج JSON صالحًا فقط بالمفتاح answers، ومصفوفة عناصرها categoryId وanswer، من غير نص إضافي أو علامات تنسيق.`;
+  const style = request.difficulty === "casual"
+    ? "اختر إجابات مألوفة وبسيطة."
+    : request.difficulty === "clever"
+      ? "العب بمستوى ذكي وصعب: فضّل إجابة دقيقة وأقل شيوعًا لكل فئة، وتجنّب أول إجابة تقليدية تخطر بالبال. استخدم معلومات وأسماء حقيقية ومعروفة، ولا تخترع كلمات أو أسماء لمجرد مطابقة الحرف. فكّر في صحة الفئة والحرف قبل الإجابة. إذا لم تجد إجابة موثوقة، أعد نصًا فارغًا لهذه الفئة بدل التخمين."
+      : "اختر إجابات صحيحة مع لمسة مرحة من دون إجابات مختلقة.";
+  return `أنت منافس تدريب في لعبة أتوبيس كومبليت. ${style} أعد إجابة واحدة فقط لكل فئة مطلوبة. يجب أن تبدأ كل إجابة بالحرف المحدد حرفيًا بعد تطبيع أشكال الألف العربية. طابق معنى الفئة بدقة؛ الإجابة الصعبة لا تُقبل إذا كانت خاطئة. لا تكتب أسماء الفئات في نص الإجابة ولا تضف شرحًا. أخرج JSON صالحًا فقط بالمفتاح answers، ومصفوفة عناصرها categoryId وanswer، من غير نص إضافي أو علامات تنسيق.`;
 }
 
 export async function POST(request: Request) {
@@ -81,7 +85,12 @@ export async function POST(request: Request) {
 
   const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
-  if (authError || !user) return json({ error: "انتهت جلسة اللاعب. حدّث الصفحة وجرّب مرة تانية." }, 401);
+  if (authError) {
+    if (authError.status === 401 || authError.status === 403) return json({ error: "انتهت جلسة اللاعب. حدّث الصفحة وجرّب مرة أخرى." }, 401);
+    console.error("Supabase session verification failed", { status: authError.status, code: authError.code });
+    return json({ error: "تعذّر الاتصال بخدمة تسجيل الدخول في Supabase. تحقّق من الإنترنت وإعدادات المشروع ثم جرّب مرة أخرى." }, 503);
+  }
+  if (!user) return json({ error: "انتهت جلسة اللاعب. حدّث الصفحة وجرّب مرة أخرى." }, 401);
   if (!allowedRequest(user.id)) return json({ error: "استخدمت الحكم الذكي مرات كتير بسرعة. استنى دقيقة وجرب تاني." }, 429);
 
   let input: unknown;
@@ -116,11 +125,11 @@ export async function POST(request: Request) {
           { role: "system", content: instructions(payload) },
           { role: "user", content: JSON.stringify(details) }
         ],
-        // Qwen's reasoning tokens count toward this limit. Keep enough room for
-        // its internal reasoning and the final JSON, especially for category lists.
-        max_completion_tokens: payload.mode === "judge" ? 600 : 1_200,
+        // Keep the generation budget focused on the short answer list so the
+        // opponent can be prepared quickly, even with all ten categories.
+        max_completion_tokens: 600,
         reasoning_effort: "low",
-        temperature: payload.mode === "judge" ? 0.2 : 0.7,
+        temperature: payload.mode === "judge" ? 0.2 : payload.difficulty === "clever" ? 0.4 : 0.7,
         stream: false,
         store: false
       }),

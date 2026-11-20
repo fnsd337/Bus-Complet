@@ -25,7 +25,7 @@ async function compressAvatar(file: File): Promise<Blob> {
     canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
     canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", .82));
-    if (!blob) throw new Error("تعذر تجهيز الصورة. جرّب صورة تانية.");
+    if (!blob) throw new Error("تعذّر تجهيز الصورة. جرّب صورة أخرى.");
     return blob;
   } finally { URL.revokeObjectURL(source); }
 }
@@ -37,18 +37,16 @@ export default function HomePage() {
   const [prefillCode, setPrefillCode] = useState("");
   const [dark, setDark] = useState(false);
   const [sound, setSound] = useState(true);
-  const [motionEnabled, setMotionEnabled] = useState(true);
+  const motionEnabled = true;
   const ready = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
   const supabase = getSupabase();
 
   useEffect(() => {
     const storedDark = localStorage.getItem("bus-dark") === "true";
     const storedSound = localStorage.getItem("bus-sound") !== "false";
-    const storedMotion = localStorage.getItem("bus-motion") !== "false";
     setDark(storedDark); setSound(storedSound);
-    setMotionEnabled(storedMotion);
     document.documentElement.dataset.theme = storedDark ? "dark" : "light";
-    document.documentElement.dataset.motion = storedMotion ? "on" : "off";
+    document.documentElement.dataset.motion = "on";
     const queryCode = new URLSearchParams(window.location.search).get("room");
     const code = queryCode ?? localStorage.getItem("bus-last-room");
     if (!code) return;
@@ -85,10 +83,6 @@ export default function HomePage() {
   const toggleSound = useCallback(() => setSound((current) => {
     const next = !current; localStorage.setItem("bus-sound", String(next)); playGameSfx(next, "tap"); return next;
   }), []);
-  const toggleMotion = useCallback(() => setMotionEnabled((current) => {
-    const next = !current; localStorage.setItem("bus-motion", String(next));
-    document.documentElement.dataset.motion = next ? "on" : "off"; return next;
-  }), []);
   const enterRoom = (entry: RoomEntry) => {
     setRoom(entry); setModal(null); setPrefillCode(entry.code);
     localStorage.setItem("bus-last-room", entry.code);
@@ -100,7 +94,7 @@ export default function HomePage() {
     setRoom(null); localStorage.removeItem("bus-last-room"); window.history.pushState({}, "", "/");
   };
 
-  return <main className="app-shell" data-theme={dark ? "dark" : "light"}><MotionConfig reducedMotion={motionEnabled ? "user" : "always"}>
+  return <main className="app-shell" data-theme={dark ? "dark" : "light"}><MotionConfig reducedMotion="never">
     <header className="wrap topbar">
       <a className="brand" href="#home" aria-label="أتوبيس كومبليت، الرئيسية">
         <span className="brand-mark"><BusFront /></span>
@@ -110,7 +104,6 @@ export default function HomePage() {
       <div className="top-actions">
         <span className="tiny-label">{ready ? "اللعب أونلاين جاهز" : "بانتظار إعداد الاتصال"}</span>
         <button className="icon-btn" onClick={toggleSound} aria-label={sound ? "إيقاف الصوت" : "تشغيل الصوت"}>{sound ? <Volume2 /> : <VolumeX />}</button>
-        <button className="icon-btn" onClick={toggleMotion} aria-label={motionEnabled ? "إيقاف الحركة" : "تشغيل الحركة"}><Sparkles /></button>
         <button className="icon-btn" onClick={toggleTheme} aria-label={dark ? "الوضع الفاتح" : "الوضع الداكن"}>{dark ? <Sun /> : <Moon />}</button>
       </div>
     </header>
@@ -120,13 +113,13 @@ export default function HomePage() {
         <motion.div className="hero-copy" initial={false} animate={{ opacity: 1, x: 0 }} transition={{ duration: motionEnabled ? .3 : 0, ease: "easeOut" }}>
           <div className="eyebrow"><span className="eyebrow-dot" /> لعبة الحروف اللي بتجمعنا</div>
           <h1>فاكر اللعبة؟<span>أتوبيس كومبليت</span></h1>
-          <p>حرف واحد، وفئات تختاروها، وتحدّي ممتع. ادعُ أصحابك إلى غرفة والعبوا أونلاين من أي مكان.</p>
+          <p>اختاروا حرفًا وفئاتكم، وابدأوا التحدّي مع أصحابكم أونلاين من أي مكان.</p>
           <div className="button-row">
             <button className="btn btn-primary" onClick={() => setModal("create")}><Play fill="currentColor" /> ابدأ اللعب <ArrowLeft /></button>
             <button className="btn btn-light" onClick={() => { setPrefillCode(""); setModal("join"); }}><DoorOpen /> انضم لغرفة</button>
-            <button className="btn btn-light solo-hero-button" onClick={() => { setModal(null); setSoloOpen(true); }}><Sparkles /> اتدرب لوحدك</button>
+            <button className="btn btn-light solo-hero-button" onClick={() => { setModal(null); setSoloOpen(true); }}><Sparkles /> اتدرّب لوحدك</button>
           </div>
-          <div className="button-note"><span className="player-stack"><span>🦊</span><span>🐼</span><span>🐯</span><span>🐧</span></span><span>من ٢ لـ ١٠ لاعبين · وكل واحد من جهازه</span></div>
+          <div className="button-note"><span className="player-stack"><span>🦊</span><span>🐼</span><span>🐯</span><span>🐧</span></span><span>من لاعبين إلى ١٠ لاعبين · وكل لاعب من جهازه</span></div>
         </motion.div>
         <motion.div className="hero-art" initial={false} animate={{ opacity: 1, scale: 1 }} transition={{ duration: motionEnabled ? .35 : 0 }} aria-label="معاينة مرحة للعبة">
           <div className="art-orbit" />
@@ -146,19 +139,19 @@ export default function HomePage() {
       </section>
 
       <section className="wrap section" id="how">
-        <div className="section-heading"><div><div className="section-kicker">تبدأ في ثواني</div><h2>ثلاث خطوات وتلاقوا نفسكم بتتنافسوا</h2></div><p>اللعبة بسيطة من أول مرة، وكل جولة بتطلع إجابات وحكايات ما كانتش على البال.</p></div>
+        <div className="section-heading"><div><div className="section-kicker">تبدأ في ثوانٍ</div><h2>ثلاث خطوات وتبدأ المنافسة</h2></div><p>اللعبة سهلة من أول مرة، وكل جولة مليانة إجابات ومواقف تضحّك.</p></div>
         <div className="steps-grid">
           <motion.article className="step-card" whileHover={motionEnabled ? { y: -4 } : undefined}><div className="step-number">٠١</div><h3>افتحوا غرفة</h3><p>أنشئ غرفة وشارك كودها أو رابط الدعوة مع أصحابك.</p></motion.article>
-          <motion.article className="step-card" whileHover={motionEnabled ? { y: -4 } : undefined}><div className="step-number">٠٢</div><h3>اختاروا الحرف</h3><p>اختاروا فئات الجولة من الفئات الجاهزة أو أضيفوا فئاتكم. كل لاعب يكتب إجاباته من جهازه.</p></motion.article>
+          <motion.article className="step-card" whileHover={motionEnabled ? { y: -4 } : undefined}><div className="step-number">٠٢</div><h3>اختاروا الحرف</h3><p>اختاروا فئات الجولة من الخيارات الجاهزة أو أضيفوا فئاتكم. كل لاعب يكتب إجاباته من جهازه.</p></motion.article>
           <motion.article className="step-card" whileHover={motionEnabled ? { y: -4 } : undefined}><div className="step-number">٠٣</div><h3>راجعوا واكسبوا</h3><p>شوفوا إجابات بعض، صوّتوا على المختلف عليه، واجمعوا النقاط.</p></motion.article>
         </div>
         <div className="score-strip" id="points">
-          <strong>كل إجابة صحّ بتقرّبك من الفوز</strong>
+          <strong>كل إجابة صحيحة تقرّبك من الفوز</strong>
           <div className="score-examples"><span className="score-chip"><b>١٠</b> إجابة صحيحة وفريدة</span><span className="score-chip"><b>٥</b> إجابة صحيحة مكررة</span><span className="score-chip"><b>٠</b> فارغة أو غير مطابقة</span></div>
         </div>
       </section>
       <section className="wrap section" id="friends" style={{ paddingTop: 0 }}>
-        <div className="section-heading"><div><div className="section-kicker">كل صحابك على نفس الحرف</div><h2>مش لازم تكونوا في نفس المكان</h2></div><p>غرفة واحدة تجمعكم، والتغييرات والنتائج بتظهر لحظيًا عند كل لاعب.</p></div>
+        <div className="section-heading"><div><div className="section-kicker">كل أصحابك على الحرف نفسه</div><h2>مش لازم تكونوا في نفس المكان</h2></div><p>غرفة واحدة تجمعكم، والتغييرات والنتائج بتظهر لحظيًا عند كل لاعب.</p></div>
         <div className="score-strip" style={{ background: "var(--mint)", color: "var(--ink)" }}>
           <strong>كل ما تحتاجونه اسم مستعار ورابط الغرفة</strong>
           <button className="btn btn-primary btn-quiet" onClick={() => setModal("create")}>جهّزوا الغرفة <ArrowLeft /></button>
@@ -202,7 +195,7 @@ function EntryDialog({ kind, code, onClose, onEnter, ready, sound, motionEnabled
         const photo = await compressAvatar(avatarFile);
         const path = `${user.id}/${crypto.randomUUID()}.webp`;
         const { error: uploadError } = await supabase.storage.from("player-avatars").upload(path, photo, { contentType: "image/webp", upsert: false });
-        if (uploadError) throw new Error("تعذر رفع صورة الحساب. تأكد من تشغيل تحديث Supabase الأخير.");
+        if (uploadError) throw new Error("تعذّر رفع صورة الحساب. تأكّد من تطبيق تحديث Supabase الأخير.");
         selectedAvatar = supabase.storage.from("player-avatars").getPublicUrl(path).data.publicUrl;
       }
       const { data, error: rpcError } = kind === "create"
@@ -217,23 +210,27 @@ function EntryDialog({ kind, code, onClose, onEnter, ready, sound, motionEnabled
       playGameSfx(sound, "join");
       onEnter({ id: resultId, code: result.code });
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "حصل خطأ غير متوقع. جرّب مرة تانية.";
-      setError(message.includes("Anonymous") || message.includes("anonymous") ? "فعّل Anonymous Sign-Ins في إعدادات Supabase ثم جرّب تاني." : message);
+      const message = cause instanceof Error ? cause.message : "حصل خطأ غير متوقع. جرّب مرة أخرى.";
+      setError(cause instanceof TypeError && message.toLowerCase().includes("fetch")
+        ? "تعذّر الاتصال بـ Supabase. تأكّد من الإنترنت ورابط المشروع في ملف .env.local، ثم جرّب مرة أخرى."
+        : message.includes("Anonymous") || message.includes("anonymous")
+          ? "فعّل Anonymous Sign-Ins في إعدادات Supabase ثم جرّب مرة أخرى."
+          : message);
     } finally { setBusy(false); }
   };
 
   return <motion.div className="modal-backdrop" initial={motionEnabled ? { opacity: 0 } : false} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: motionEnabled ? .18 : 0 }} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <motion.section className="modal" role="dialog" aria-modal="true" aria-labelledby="entry-title" initial={motionEnabled ? { opacity: 0, y: 17, scale: .98 } : false} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: motionEnabled ? .2 : 0 }}>
-      <div className="modal-head"><div><h2 id="entry-title">{kind === "create" ? "يلا نفتح غرفة" : "انضم للّمة"}</h2><p>{kind === "create" ? "اختار اسمك وصورتك، وخلي الباقي علينا." : "اكتب كود الدعوة وخش على أصحابك."}</p></div><button className="close-btn" onClick={onClose} aria-label="إغلاق"><X size={17} /></button></div>
+      <div className="modal-head"><div><h2 id="entry-title">{kind === "create" ? "يلا نفتح غرفة" : "انضم للّمة"}</h2><p>{kind === "create" ? "اختَر اسمك وصورتك، والباقي علينا." : "اكتب كود الدعوة وانضم لأصحابك."}</p></div><button className="close-btn" onClick={onClose} aria-label="إغلاق"><X size={17} /></button></div>
       {!ready && <div className="connection-note"><Clock3 /> <span>اللعب أونلاين يحتاج إعداد Supabase مرة واحدة. الواجهة جاهزة، ولن ننشئ غرفة محلية وهمية.</span></div>}
       <div className="form-group"><label className="field-label" htmlFor="player-name">اسمك المستعار</label><input id="player-name" className="text-field" maxLength={24} placeholder="مثال: مريم" value={name} onChange={(event) => setName(event.target.value)} autoFocus /></div>
       {kind === "join" && <div className="form-group"><label className="field-label" htmlFor="room-code">كود الغرفة</label><input id="room-code" className="text-field" dir="ltr" style={{ letterSpacing: ".18em", fontWeight: 900 }} maxLength={6} placeholder="ABC123" value={roomCode} onChange={(event) => setRoomCode(event.target.value.toUpperCase())} /></div>}
-      <div className="form-group"><span className="field-label">اختار صورتك</span>
-        <label className={`avatar-upload ${avatarFile || hasSavedPhoto ? "active" : ""}`} htmlFor="avatar-photo"><Camera size={17} /><span>{avatarFile || hasSavedPhoto ? "صورتك الحالية" : "اختار صورة من جهازك"}</span>{(avatarFile || hasSavedPhoto) && <PlayerAvatar value={avatar} className="avatar-option-preview" />}</label>
+      <div className="form-group"><span className="field-label">اختر صورتك</span>
+        <label className={`avatar-upload ${avatarFile || hasSavedPhoto ? "active" : ""}`} htmlFor="avatar-photo"><Camera size={17} /><span>{avatarFile || hasSavedPhoto ? "صورتك الحالية" : "اختر صورة من جهازك"}</span>{(avatarFile || hasSavedPhoto) && <PlayerAvatar value={avatar} className="avatar-option-preview" />}</label>
         <input className="avatar-file-input" id="avatar-photo" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => {
           const file = event.target.files?.[0];
           if (!file) return;
-          if (file.size > 5 * 1024 * 1024) { setError("اختار صورة حجمها أقل من ٥ ميجابايت."); event.target.value = ""; return; }
+          if (file.size > 5 * 1024 * 1024) { setError("اختر صورة حجمها أقل من ٥ ميجابايت."); event.target.value = ""; return; }
           setError(""); setAvatarFile(file); setAvatar(URL.createObjectURL(file));
         }} />
         <div className="avatar-picker">{AVATARS.map((item) => <button type="button" className={`avatar-option ${!avatarFile && avatar === item ? "active" : ""}`} key={item} onClick={() => { setAvatarFile(null); setAvatar(item); }} aria-label={`الصورة ${item}`}><PlayerAvatar value={item} /></button>)}</div>

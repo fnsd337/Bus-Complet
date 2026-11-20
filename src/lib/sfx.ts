@@ -1,4 +1,4 @@
-export type SfxCue = "tap" | "join" | "letter" | "bus" | "approve" | "reject" | "win";
+export type SfxCue = "tap" | "join" | "letter" | "bus" | "approve" | "reject" | "win" | "ready" | "reveal" | "combo" | "tie";
 
 let audioContext: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -16,7 +16,7 @@ function getAudioContext() {
     compressor.attack.value = .004;
     compressor.release.value = .16;
     master = audioContext.createGain();
-    master.gain.value = .52;
+    master.gain.value = .38;
     master.connect(compressor);
     compressor.connect(audioContext.destination);
   }
@@ -55,7 +55,7 @@ function softAir(context: AudioContext, start: number, duration: number) {
   filter.type = "lowpass";
   filter.frequency.value = 720;
   envelope.gain.setValueAtTime(.0001, start);
-  envelope.gain.exponentialRampToValueAtTime(.065, start + .025);
+  envelope.gain.exponentialRampToValueAtTime(.045, start + .025);
   envelope.gain.exponentialRampToValueAtTime(.0001, start + duration);
   source.buffer = buffer;
   source.connect(filter);
@@ -84,6 +84,24 @@ export function playGameSfx(enabled: boolean, cue: SfxCue = "tap") {
     case "letter":
       note(context, 360, now, .17, { wave: "triangle", volume: .075, endFrequency: 510 });
       note(context, 510, now + .12, .22, { wave: "sine", volume: .075, endFrequency: 640 });
+      break;
+    case "ready":
+      note(context, 587.33, now, .12, { wave: "triangle", volume: .055, cutoff: 2400 });
+      note(context, 783.99, now + .075, .16, { wave: "sine", volume: .05, cutoff: 2800 });
+      break;
+    case "reveal":
+      note(context, 659.25, now, .16, { wave: "sine", volume: .045, cutoff: 2600 });
+      note(context, 880, now + .08, .2, { wave: "triangle", volume: .04, cutoff: 3000 });
+      break;
+    case "combo":
+      note(context, 523.25, now, .13, { wave: "triangle", volume: .06, cutoff: 2800 });
+      note(context, 659.25, now + .065, .15, { wave: "sine", volume: .055, cutoff: 3200 });
+      note(context, 783.99, now + .13, .17, { wave: "triangle", volume: .05, cutoff: 3500 });
+      note(context, 1046.5, now + .2, .25, { wave: "sine", volume: .045, cutoff: 3800 });
+      break;
+    case "tie":
+      note(context, 440, now, .22, { wave: "sine", volume: .05, cutoff: 2200 });
+      note(context, 554.37, now + .12, .24, { wave: "triangle", volume: .045, cutoff: 2400 });
       break;
     case "bus":
       note(context, 220, now, .32, { wave: "triangle", volume: .11, cutoff: 1100 });
