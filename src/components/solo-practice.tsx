@@ -35,8 +35,8 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
     ? [{ playerId: "you", values }, { playerId: "rival", values: opponentAnswers }]
     : [{ playerId: "you", values }], [opponentAnswers, values, withOpponent]);
   const scores = useMemo(() => scoreAnswers(answersForScore, letter, categories), [answersForScore, categories, letter]);
-  const playerPoints = Object.values(scores.you ?? {}).reduce((sum, score) => sum + (score ?? 0), 0);
-  const opponentPoints = Object.values(scores.rival ?? {}).reduce((sum, score) => sum + (score ?? 0), 0);
+  const playerPoints = Object.values(scores.you ?? {}).reduce<number>((sum, score) => sum + (score ?? 0), 0);
+  const opponentPoints = Object.values(scores.rival ?? {}).reduce<number>((sum, score) => sum + (score ?? 0), 0);
   const allFilled = categories.length > 0 && categories.every((category) => Boolean(values[category]?.trim()));
   const allValid = categories.length > 0 && categories.every((category) => answerStartsWithLetter(values[category] ?? "", letter));
 
