@@ -24,6 +24,10 @@ Copy-Item .env.example .env.local
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
+# Optional: Cloudflare Workers AI, for the smart judge and AI training opponent
+CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id
+CLOUDFLARE_API_TOKEN=your-cloudflare-workers-ai-token
+CLOUDFLARE_AI_MODEL=@cf/qwen/qwen3.8-27b
 ```
 
 ثم شغّل:
@@ -33,12 +37,12 @@ npm install
 npm run dev
 ```
 
-افتح `http://localhost:3000`. تحتاج Next.js 16 إلى Node.js 20.9 أو أحدث. يقبل التطبيق مفتاح `Publishable` الحديث، كما يقبل مفتاح `anon` للمشاريع الأقدم. لا تضع `Secret` أو `service_role` في الواجهة أو في متغير يبدأ بـ `NEXT_PUBLIC_`.
+افتح `http://localhost:3000`. تحتاج Next.js 16 إلى Node.js 20.9 أو أحدث. يقبل التطبيق مفتاح `Publishable` الحديث، كما يقبل مفتاح `anon` للمشاريع الأقدم. التدريب الفردي العادي يعمل من دون AI؛ لتشغيل المنافس والحكم، أنشئ حساب Cloudflare بالبريد وكلمة المرور، ثم من **AI → Workers AI → Use REST API** انسخ **Account ID** وأنشئ API Token بصلاحية **Workers AI - Read**. أضف `CLOUDFLARE_ACCOUNT_ID` و`CLOUDFLARE_API_TOKEN` في `.env.local`. اترك حسابك على خطة Workers Free؛ لها حصة يومية مجانية، وبعد تجاوزها تتوقف الطلبات بدل الترقية أو الفوترة. لا تضع التوكن في متغير يبدأ بـ `NEXT_PUBLIC_` أو ترفعه إلى Git.
 
 ### ٣. النشر على Vercel ومشاركة اللعبة
 
 1. ارفع هذا المجلد إلى مستودع Git، ثم استورده من لوحة Vercel.
-2. في **Project Settings → Environment Variables** أضف `NEXT_PUBLIC_SUPABASE_URL` و`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` لبيئات Production وPreview.
+2. في **Project Settings → Environment Variables** أضف `NEXT_PUBLIC_SUPABASE_URL` و`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` لبيئات Production وPreview. لإتاحة الحكم ومنافس التدريب، أضف `CLOUDFLARE_ACCOUNT_ID` و`CLOUDFLARE_API_TOKEN` ثم أعد النشر. لا تضف البادئة `NEXT_PUBLIC_` لهذه القيم. استخدم Workers Free؛ إذا انتهت حصته اليومية سيتوقف AI إلى أن تتجدد الحصة.
 3. انشر المشروع. انسخ رابط Vercel، ثم أنشئ غرفة وشارك رابط الدعوة أو كود الغرفة مع أصحابك.
 
 قبل الإطلاق، أضف نطاق Vercel إلى **Authentication → URL Configuration → Redirect URLs** في Supabase. لا يحتاج تسجيل الدخول المجهول إلى مسار تحويل، لكن إعداد عنوان الموقع يسمح باستخدام الروابط والنطاقات المنشورة بوضوح.
@@ -55,8 +59,12 @@ npm run dev
 - عرض النتائج وسجل الجولات والتصويت على الإجابات المختلف عليها مع إظهار تقدّم التصويت وتصحيح المضيف وإعادة حساب النقاط.
 - سجل للغرفة عبر المباريات: عدد مرات الفوز، أفضل سلسلة انتصارات، وعدد مرات إكمال الأتوبيس وأسرع إكمال.
 - مراجعة الإجابات بالتتابع لاعبًا بعد لاعب مع صورة كبيرة وتصويت متحرك بالموافقة أو الرفض.
+- تدريب فردي بلا مؤقت مع فئات وحروف تختارها، وإمكانية منافسة خصم ذكي بإجابات تُجهّز قبل بدء الجولة.
+- حكم ذكي يعطي رأيًا استرشاديًا عن الإجابة ومعه درجة ثقة وسبب مختصر؛ يظل قرار التصويت أو اعتماد المضيف هو الذي يغيّر النتيجة.
 - تفاعلات فورية، ومغادرة وإعادة اتصال، ونقل دور المضيف عند انقطاعه، وإغلاق الغرفة عند خروج آخر لاعب، وإعادة المباراة.
 - تصميم RTL متجاوب للهاتف واللوحي والكمبيوتر، ووضع داكن/فاتح، ومؤثرات صوتية اختيارية، وحركات تحترم إعداد تقليل الحركة في الجهاز.
+
+المنافس الذكي والحكم يحتاجان توكن Cloudflare سريًا في الخادم. عند استخدام المنافس نرسل الحرف والفئات المختارة فقط؛ وعند استخدام الحكم نرسل الحرف والفئة والإجابة المطلوب مراجعتها. المسار يتحقق من جلسة Supabase ويحدّ الطلبات لكل لاعب. حصة Workers AI المجانية تتجدد يوميًا؛ لا تغيّر حسابك إلى خطة مدفوعة إذا كنت لا تريد فوترة.
 
 لا توجد قائمة قاموس عربية شاملة داخل التطبيق؛ لذا يعتبر الحساب الآلي الإجابة غير الفارغة التي تبدأ بالحرف صالحة مبدئيًا، وتتيح شاشة النتائج مراجعتها بالتصويت وتصحيح المضيف. هذا يمنع الادعاء بأن فحص البداية وحده يثبت صحة المعنى.
 

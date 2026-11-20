@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, BusFront, Check, CheckCheck, Copy, LogOut, Moon, Plus, RotateCcw, Share2, Sun, Trophy, Volume2, VolumeX, WifiOff, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BusFront, Check, CheckCheck, Copy, LogOut, Moon, Plus, RotateCcw, Share2, Sparkles, Sun, Trophy, Volume2, VolumeX, WifiOff, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ARABIC_LETTERS, answerStartsWithLetter, CATEGORIES, getCategory, type Answer, type AnswerVote, type CategoryId, type Player,
@@ -9,10 +9,12 @@ import {
 } from "@/lib/game";
 import PlayerAvatar from "@/components/player-avatar";
 import { ensureUser, getSupabase } from "@/lib/supabase";
+import type { SfxCue } from "@/lib/sfx";
 
 type RoomState = { room: Room; players: Player[]; rounds: Round[]; answers: Answer[]; votes: AnswerVote[] };
-type GameRoomProps = { roomId: string; roomCode: string; sound: boolean; motionEnabled: boolean; onSound: () => void; onToggleSound: () => void; onExit: () => void };
+type GameRoomProps = { roomId: string; roomCode: string; sound: boolean; motionEnabled: boolean; onSound: (cue?: SfxCue) => void; onToggleSound: () => void; onExit: () => void };
 type Reaction = { id: number; emoji: string; name: string };
+type AiJudgment = { verdict: "valid" | "invalid" | "uncertain"; confidence: number; reason: string };
 const EMOJIS = ["😂", "🔥", "👏", "😎", "❤️"];
 
 function getError(cause: unknown) {
@@ -33,6 +35,8 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   const [reviewPlayerIndex, setReviewPlayerIndex] = useState(0);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [newCategory, setNewCategory] = useState("");
+  const [aiJudgments, setAiJudgments] = useState<Record<string, AiJudgment>>({});
+  const [aiBusyKey, setAiBusyKey] = useState("");
   const [values, setValues] = useState<Partial<Record<CategoryId, string>>>({});
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -40,6 +44,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   const [settings, setSettings] = useState<Settings | null>(null);
   const channelRef = useRef<ReturnType<NonNullable<typeof supabase>["channel"]> | null>(null);
   const refreshRef = useRef<() => Promise<void>>(async () => {});
+  const winSoundPlayedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!supabase) throw new Error("إعداد Supabase غير مكتمل.");
@@ -118,6 +123,12 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   useEffect(() => { setSelectedRound(null); }, [currentRound?.number]);
   useEffect(() => { setReviewPlayerIndex(0); }, [shownRound?.id]);
   useEffect(() => {
+    if (state?.room.status === "finished" && !winSoundPlayedRef.current) {
+      winSoundPlayedRef.current = true;
+      onSound("win");
+    } else if (state?.room.status !== "finished") winSoundPlayedRef.current = false;
+  }, [onSound, state?.room.status]);
+  useEffect(() => {
     if (!state?.room.id) return;
     const heartbeat = () => { void supabase?.rpc("heartbeat_room", { p_room_id: roomId }); };
     heartbeat();
@@ -167,12 +178,12 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
     return () => window.clearTimeout(timer);
   }, [currentRound?.id, currentRound?.status, locked, me?.id, roomId, supabase, values]);
 
-  const rpc = async (name: string, args: Record<string, unknown>, success?: string) => {
+  const rpc = async (name: string, args: Record<string, unknown>, success?: string, cue: SfxCue = "tap") => {
     if (!supabase) return;
     const { error: rpcError } = await supabase.rpc(name, args);
     if (rpcError) throw rpcError;
     if (success) notify(success);
-    onSound();
+    onSound(cue);
     await refresh();
   };
 
@@ -183,20 +194,20 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
       if (settingsError) throw settingsError;
       const { error: startError } = await supabase.rpc("start_match", { p_room_id: roomId });
       if (startError) throw startError;
-      onSound(); await refresh();
+      onSound("join"); await refresh();
     } catch (cause) { notify(getError(cause)); }
   };
 
   const copyInvite = async () => {
     const url = `${window.location.origin}/?room=${roomCode}`;
-    try { await navigator.clipboard.writeText(url); notify("تم نسخ رابط الدعوة."); onSound(); }
+    try { await navigator.clipboard.writeText(url); notify("تم نسخ رابط الدعوة."); onSound("tap"); }
     catch { notify(url); }
   };
 
   const shareInvite = async () => {
     const url = `${window.location.origin}/?room=${roomCode}`;
     if (navigator.share) {
-      try { await navigator.share({ title: "أتوبيس كومبليت", text: "تعالى العب أتوبيس كومبليت معايا!", url }); }
+      try { await navigator.share({ title: "أتوبيس كومبليت", text: "تعالى العب أتوبيس كومبليت معايا!", url }); onSound("tap"); }
       catch (cause) { if (cause instanceof Error && cause.name !== "AbortError") notify("تعذرت مشاركة الرابط. استخدم زر نسخ الدعوة."); }
       return;
     }
@@ -225,6 +236,26 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
     setNewCategory("");
   };
 
+  const askAiJudge = async (roundId: string, playerId: string, categoryId: CategoryId, letter: string, categoryLabel: string, answer: string) => {
+    const judgeKey = `${roundId}:${playerId}:${categoryId}`;
+    if (!supabase) { notify("الحكم الذكي محتاج إعداد Supabase."); return; }
+    setAiBusyKey(judgeKey);
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) throw new Error("انتهت جلسة اللاعب. حدّث الصفحة وجرب تاني.");
+      const response = await fetch("/api/game-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ mode: "judge", letter, category: categoryLabel, answer })
+      });
+      const result = await response.json() as AiJudgment & { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "تعذر تشغيل الحكم الذكي.");
+      setAiJudgments((current) => ({ ...current, [judgeKey]: result }));
+      onSound(result.verdict === "invalid" ? "reject" : "approve");
+    } catch (cause) { notify(getError(cause)); }
+    finally { setAiBusyKey(""); }
+  };
+
   const finishMyRound = async () => {
     if (!supabase || !currentRound) return;
     setSubmitting(true);
@@ -233,7 +264,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
       if (saveResult.error && !myAnswer?.locked_at) throw saveResult.error;
       const { error: finishError } = await supabase.rpc("finish_round", { p_room_id: roomId });
       if (finishError) throw finishError;
-      notify("أتوبيس كومبليت! اتقفلت الجولة على الكل."); onSound(); await refresh();
+      notify("أتوبيس كومبليت! اتقفلت الجولة على الكل."); onSound("bus"); await refresh();
     } catch (cause) { notify(getError(cause)); }
     finally { setSubmitting(false); }
   };
@@ -241,7 +272,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   const sendReaction = async (emoji: string) => {
     if (!channelRef.current || !me) return;
     await channelRef.current.send({ type: "broadcast", event: "reaction", payload: { emoji, name: me.display_name } });
-    onSound();
+    onSound("tap");
   };
 
   if (loading) return <div className="wrap"><div className="loading-panel"><div><div className="spinner" /> بنجهز الغرفة...</div></div></div>;
@@ -305,7 +336,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
                 <motion.div className="letter-picker-avatar" animate={motionEnabled ? { y: [0, -8, 0], rotate: [-2, 2, -2] } : undefined} transition={{ duration: 2.4, repeat: Infinity }}><PlayerAvatar value={picker?.avatar ?? "🦊"} /></motion.div>
                 <div><span className="section-kicker">دور اختيار الحرف</span><h2>{myTurn ? "اختار حرف الجولة!" : `${picker?.display_name ?? "اللاعب"} بيختار الحرف`}</h2><p>{myTurn ? "بعد اختيارك، الجولة هتبدأ عند كل اللاعبين." : "لحظات وتبدأ الجولة الجديدة."}</p></div>
               </div>
-              {myTurn ? <div className="letter-choice-grid">{ARABIC_LETTERS.map((letter) => <motion.button key={letter} className="letter-choice" whileHover={motionEnabled ? { y: -3, scale: 1.06 } : undefined} whileTap={{ scale: .92 }} onClick={() => void rpc("pick_round_letter", { p_room_id: roomId, p_letter: letter }, `اخترت حرف ${letter}.`).catch((cause) => notify(getError(cause)))}>{letter}</motion.button>)}</div>
+              {myTurn ? <div className="letter-choice-grid">{ARABIC_LETTERS.map((letter) => <motion.button key={letter} className="letter-choice" whileHover={motionEnabled ? { y: -3, scale: 1.06 } : undefined} whileTap={{ scale: .92 }} onClick={() => void rpc("pick_round_letter", { p_room_id: roomId, p_letter: letter }, `اخترت حرف ${letter}.`, "letter").catch((cause) => notify(getError(cause)))}>{letter}</motion.button>)}</div>
                 : <div className="letter-waiting"><span className="spinner" /> {picker?.display_name ?? "اللاعب التالي"} يختار الحرف دلوقتي</div>}
             </>;
           })()}
@@ -352,20 +383,27 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
                   const myVote = categoryVotes.find((vote) => vote.voter_id === me.id);
                   const voteThreshold = Math.max(1, Math.ceil((state.players.length - 1) * .6));
                   const resultOverride = reviewAnswer?.overrides?.[categoryId];
+                  const judgeKey = `${shownRound.id}:${reviewPlayer.id}:${categoryId}`;
+                  const judgment = aiJudgments[judgeKey];
                   return <motion.div className="review-answer-row" key={categoryId} initial={motionEnabled ? { opacity: 0, y: 10 } : false} animate={{ opacity: 1, y: 0 }} transition={{ delay: motionEnabled ? index * .045 : 0 }}>
                     <span className="category-icon">{category.icon}</span><strong className="review-category-name">{category.label}</strong>
                     <span className={`review-answer-text ${value ? "" : "blank-answer"}`}>{value || "لم يكتب إجابة"}</span>
                     <span className="review-points">{points} نقطة</span>
-                    {canVote && <div className="review-vote-actions">{isHost ? <>
-                      <motion.button className="vote-yes" whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="اعتماد الإجابة" onClick={() => void rpc("host_set_answer_valid", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_valid: true }, "تم اعتماد الإجابة وتحديث النقاط.").catch((cause) => notify(getError(cause)))}><Check /> صحيح</motion.button>
-                      <motion.button className="vote-no" whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="رفض الإجابة" onClick={() => void rpc("host_set_answer_valid", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_valid: false }, "تم رفض الإجابة وتحديث النقاط.").catch((cause) => notify(getError(cause)))}><X /> خطأ</motion.button>
-                    </> : <>
-                      <div className="review-vote-box">
-                        <div className="vote-progress"><strong>{resultOverride === undefined ? `${categoryVotes.length} / ${voteThreshold} أصوات` : resultOverride ? "الإجابة مقبولة" : "الإجابة مرفوضة"}</strong><small>{myVote ? myVote.accepted ? "صوّتَّ بالموافقة" : "صوّتَّ بالرفض" : "صوّت على الإجابة"}</small></div>
-                        <motion.button className={`vote-yes ${myVote?.accepted ? "voted" : ""}`} whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="أوافق على الإجابة" onClick={() => void rpc("cast_answer_vote", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_accepted: true }, "وصل تصويتك.").catch((cause) => notify(getError(cause)))}><Check /> أوافق</motion.button>
-                        <motion.button className={`vote-no ${myVote?.accepted === false ? "voted" : ""}`} whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="لا أوافق على الإجابة" onClick={() => void rpc("cast_answer_vote", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_accepted: false }, "وصل تصويتك.").catch((cause) => notify(getError(cause)))}><X /> لا أوافق</motion.button>
+                    {canVote && <div className="answer-review-tools">
+                      <div className="ai-judge-panel">
+                        <button className="ai-judge-button" disabled={Boolean(aiBusyKey) || Boolean(judgment)} onClick={() => void askAiJudge(shownRound.id, reviewPlayer.id, categoryId, shownRound.letter, category.label, value)}><Sparkles size={15} />{aiBusyKey === judgeKey ? "الحكم بيفكر..." : judgment ? "تم سؤال الحكم" : "اسأل الحكم الذكي"}</button>
+                        <small className="ai-judge-privacy">عند السؤال، نرسل الإجابة والفئة والحرف للحكم الذكي.</small>
+                        {judgment && <div className={`ai-judge-result ai-${judgment.verdict}`}><strong>{judgment.verdict === "valid" ? "الإجابة مرجّحة الصحة" : judgment.verdict === "invalid" ? "الإجابة مرجّحة الخطأ" : "الحكم مش متأكد"} · ثقة {Math.round(judgment.confidence * 100)}٪</strong><span>{judgment.reason}</span><small>اقتراح استرشادي؛ قرار التصويت النهائي لكم.</small></div>}
                       </div>
-                    </>}</div>}
+                      <div className="review-vote-actions">{isHost ? <>
+                        <motion.button className="vote-yes" whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="اعتماد الإجابة" onClick={() => void rpc("host_set_answer_valid", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_valid: true }, "تم اعتماد الإجابة وتحديث النقاط.", "approve").catch((cause) => notify(getError(cause)))}><Check /> صحيح</motion.button>
+                        <motion.button className="vote-no" whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="رفض الإجابة" onClick={() => void rpc("host_set_answer_valid", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_valid: false }, "تم رفض الإجابة وتحديث النقاط.", "reject").catch((cause) => notify(getError(cause)))}><X /> خطأ</motion.button>
+                      </> : <div className="review-vote-box">
+                        <div className="vote-progress"><strong>{resultOverride === undefined ? `${categoryVotes.length} / ${voteThreshold} أصوات` : resultOverride ? "الإجابة مقبولة" : "الإجابة مرفوضة"}</strong><small>{myVote ? myVote.accepted ? "صوّتَّ بالموافقة" : "صوّتَّ بالرفض" : "صوّت على الإجابة"}</small></div>
+                        <motion.button className={`vote-yes ${myVote?.accepted ? "voted" : ""}`} whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="أوافق على الإجابة" onClick={() => void rpc("cast_answer_vote", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_accepted: true }, "وصل تصويتك.", "approve").catch((cause) => notify(getError(cause)))}><Check /> أوافق</motion.button>
+                        <motion.button className={`vote-no ${myVote?.accepted === false ? "voted" : ""}`} whileHover={motionEnabled ? { y: -2, scale: 1.04 } : undefined} whileTap={{ scale: .9 }} aria-label="لا أوافق على الإجابة" onClick={() => void rpc("cast_answer_vote", { p_round_id: shownRound.id, p_answer_player_id: reviewPlayer.id, p_category: categoryId, p_accepted: false }, "وصل تصويتك.", "reject").catch((cause) => notify(getError(cause)))}><X /> لا أوافق</motion.button>
+                      </div>}</div>
+                    </div>}
                   </motion.div>;
                 })}
               </div>
@@ -374,7 +412,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
           </AnimatePresence>
           <div className="results-footer"><div className="setting-options">{state.rounds.map((round) => <button className={`choice-chip ${shownRound.number === round.number ? "selected" : ""}`} key={round.id} onClick={() => setSelectedRound(round.number)}>جولة {round.number}</button>)}</div>
             {state.room.status === "finished" && <button className="btn btn-light" onClick={() => setSelectedRound(null)}>الترتيب النهائي <Trophy /></button>}
-            {isHost && shownRound.number === state.room.current_round && shownRound.status === "review" && <button className="btn btn-primary" onClick={() => void rpc("start_next_round", { p_room_id: roomId }).catch((cause) => notify(getError(cause)))}>{shownRound.number >= state.room.settings.round_count ? "النتيجة النهائية" : "الجولة التالية"} <ArrowLeft /></button>}
+            {isHost && shownRound.number === state.room.current_round && shownRound.status === "review" && <button className="btn btn-primary" onClick={() => void rpc("start_next_round", { p_room_id: roomId }, undefined, "letter").catch((cause) => notify(getError(cause)))}>{shownRound.number >= state.room.settings.round_count ? "النتيجة النهائية" : "الجولة التالية"} <ArrowLeft /></button>}
           </div>
         </motion.div>}
 
@@ -391,7 +429,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
             <article className="achievement-card"><span>🚌 أسرع أتوبيس مكتمل</span><strong>{fastestLeader?.display_name ?? "لسه مفيش رقم"}</strong><small>{formatRecordTime(fastestLeader?.fastest_bus_ms)}</small></article>
           </div></section>
           <div className="room-card" style={{ padding: 0, boxShadow: "none" }}>{rankedPlayers.map((player,index) => <div className="rank-row" key={player.id}><b>{index+1}</b><PlayerAvatar className="avatar-large" value={player.avatar} /><div className="rank-player-details"><span>{player.display_name}</span><small>{player.wins ?? 0} فوز · {player.bus_completes ?? 0} أتوبيس مكتمل</small></div><strong>{player.total_score} نقطة</strong></div>)}</div>
-          <div className="button-row" style={{ justifyContent: "center", marginTop: 20 }}><button className="btn btn-primary" disabled={!isHost} onClick={() => void rpc("restart_match", { p_room_id: roomId }, "جهزنا غرفة جديدة بنفس اللاعبين.").then(() => setSelectedRound(null)).catch((cause) => notify(getError(cause)))}><RotateCcw /> العبوا مرة تانية</button><button className="btn btn-light" onClick={onExit}>العودة للرئيسية</button></div>
+          <div className="button-row" style={{ justifyContent: "center", marginTop: 20 }}><button className="btn btn-primary" disabled={!isHost} onClick={() => void rpc("restart_match", { p_room_id: roomId }, "جهزنا غرفة جديدة بنفس اللاعبين.", "join").then(() => setSelectedRound(null)).catch((cause) => notify(getError(cause)))}><RotateCcw /> العبوا مرة تانية</button><button className="btn btn-light" onClick={onExit}>العودة للرئيسية</button></div>
           {!isHost && <div className="tiny-label" style={{ textAlign: "center", marginTop: 10 }}>المضيف يقدر يعيد المباراة بنفس اللاعبين.</div>}
         </motion.div>}
       </AnimatePresence>

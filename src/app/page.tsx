@@ -4,9 +4,11 @@ import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { ArrowLeft, BusFront, Camera, Clock3, DoorOpen, Moon, Play, Sparkles, Sun, UsersRound, Volume2, VolumeX, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import GameRoom from "@/components/game-room";
+import SoloPractice from "@/components/solo-practice";
 import PlayerAvatar from "@/components/player-avatar";
 import { AVATARS } from "@/lib/game";
 import { ensureUser, getSupabase } from "@/lib/supabase";
+import { playGameSfx } from "@/lib/sfx";
 
 type RoomEntry = { id: string; code: string };
 type ModalKind = "create" | "join" | null;
@@ -28,24 +30,9 @@ async function compressAvatar(file: File): Promise<Blob> {
   } finally { URL.revokeObjectURL(source); }
 }
 
-function playTone(enabled: boolean, frequency = 520) {
-  if (!enabled || typeof window === "undefined") return;
-  try {
-    const context = new AudioContext();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = frequency;
-    gain.gain.setValueAtTime(.06, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .16);
-    oscillator.connect(gain); gain.connect(context.destination);
-    oscillator.start(); oscillator.stop(context.currentTime + .17);
-    oscillator.onended = () => void context.close();
-  } catch { /* Audio is an optional enhancement. */ }
-}
-
 export default function HomePage() {
   const [room, setRoom] = useState<RoomEntry | null>(null);
+  const [soloOpen, setSoloOpen] = useState(false);
   const [modal, setModal] = useState<ModalKind>(null);
   const [prefillCode, setPrefillCode] = useState("");
   const [dark, setDark] = useState(false);
@@ -96,7 +83,7 @@ export default function HomePage() {
     });
   }, []);
   const toggleSound = useCallback(() => setSound((current) => {
-    const next = !current; localStorage.setItem("bus-sound", String(next)); playTone(next, 690); return next;
+    const next = !current; localStorage.setItem("bus-sound", String(next)); playGameSfx(next, "tap"); return next;
   }), []);
   const toggleMotion = useCallback(() => setMotionEnabled((current) => {
     const next = !current; localStorage.setItem("bus-motion", String(next));
@@ -106,7 +93,7 @@ export default function HomePage() {
     setRoom(entry); setModal(null); setPrefillCode(entry.code);
     localStorage.setItem("bus-last-room", entry.code);
     window.history.pushState({}, "", `/?room=${entry.code}`);
-    playTone(sound, 660);
+    playGameSfx(sound, "join");
   };
   const exitRoom = () => {
     if (room && supabase) void supabase.rpc("leave_room", { p_room_id: room.id });
@@ -128,7 +115,7 @@ export default function HomePage() {
       </div>
     </header>
 
-    {room ? <GameRoom roomId={room.id} roomCode={room.code} sound={sound} motionEnabled={motionEnabled} onSound={() => playTone(sound, 740)} onToggleSound={toggleSound} onExit={exitRoom} /> : <>
+    {room ? <GameRoom roomId={room.id} roomCode={room.code} sound={sound} motionEnabled={motionEnabled} onSound={(cue) => playGameSfx(sound, cue)} onToggleSound={toggleSound} onExit={exitRoom} /> : soloOpen ? <SoloPractice motionEnabled={motionEnabled} onSound={(cue) => playGameSfx(sound, cue)} onExit={() => setSoloOpen(false)} /> : <>
       <section className="wrap hero" id="home">
         <motion.div className="hero-copy" initial={false} animate={{ opacity: 1, x: 0 }} transition={{ duration: motionEnabled ? .3 : 0, ease: "easeOut" }}>
           <div className="eyebrow"><span className="eyebrow-dot" /> لعبة الحروف اللي بتجمعنا</div>
@@ -137,6 +124,7 @@ export default function HomePage() {
           <div className="button-row">
             <button className="btn btn-primary" onClick={() => setModal("create")}><Play fill="currentColor" /> ابدأ اللعب <ArrowLeft /></button>
             <button className="btn btn-light" onClick={() => { setPrefillCode(""); setModal("join"); }}><DoorOpen /> انضم لغرفة</button>
+            <button className="btn btn-light solo-hero-button" onClick={() => { setModal(null); setSoloOpen(true); }}><Sparkles /> اتدرب لوحدك</button>
           </div>
           <div className="button-note"><span className="player-stack"><span>🦊</span><span>🐼</span><span>🐯</span><span>🐧</span></span><span>من ٢ لـ ١٠ لاعبين · وكل واحد من جهازه</span></div>
         </motion.div>
@@ -179,7 +167,7 @@ export default function HomePage() {
       <footer className="wrap footer"><div className="footer-brand"><span className="brand-mark"><BusFront /></span><span>أتوبيس كومبليت</span></div><span>لعبة الحروف والتحدّي بين الأصدقاء.</span></footer>
     </>}
 
-    <AnimatePresence>{modal && !room && <EntryDialog kind={modal} code={prefillCode} onClose={() => setModal(null)} onEnter={enterRoom} ready={ready} sound={sound} motionEnabled={motionEnabled} />}</AnimatePresence>
+    <AnimatePresence>{modal && !room && !soloOpen && <EntryDialog kind={modal} code={prefillCode} onClose={() => setModal(null)} onEnter={enterRoom} ready={ready} sound={sound} motionEnabled={motionEnabled} />}</AnimatePresence>
   </MotionConfig></main>;
 }
 
@@ -226,7 +214,7 @@ function EntryDialog({ kind, code, onClose, onEnter, ready, sound, motionEnabled
       if (!resultId) throw new Error("لم يرجع الخادم بيانات الغرفة.");
       localStorage.setItem("bus-name", name.trim());
       localStorage.setItem("bus-avatar", selectedAvatar);
-      playTone(sound, 600);
+      playGameSfx(sound, "join");
       onEnter({ id: resultId, code: result.code });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "حصل خطأ غير متوقع. جرّب مرة تانية.";
