@@ -10,6 +10,7 @@ import type { SfxCue } from "@/lib/sfx";
 type Difficulty = "casual" | "clever" | "playful";
 type SoloStage = "setup" | "playing" | "results";
 type SoloPracticeProps = { motionEnabled: boolean; onSound: (cue?: SfxCue) => void; onExit: () => void };
+type JudgmentResult = { verdict: "valid" | "invalid"; reason: string };
 
 const difficultyOptions: Array<{ id: Difficulty; label: string; note: string }> = [
   { id: "casual", label: "هادي", note: "إجابات بسيطة ومألوفة" },
@@ -25,22 +26,35 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
   const [difficulty, setDifficulty] = useState<Difficulty>("clever");
   const [values, setValues] = useState<Partial<Record<CategoryId, string>>>({});
   const [opponentAnswers, setOpponentAnswers] = useState<Partial<Record<CategoryId, string>>>({});
+  const [judgments, setJudgments] = useState<Record<string, JudgmentResult>>({});
   const [withOpponent, setWithOpponent] = useState(false);
   const [opponentReady, setOpponentReady] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [judging, setJudging] = useState(false);
   const [error, setError] = useState("");
   const aiRequestId = useRef(0);
 
   useEffect(() => { setName(localStorage.getItem("bus-name")?.trim() || "اللاعب"); }, []);
 
+  const validValues = useMemo(() => Object.fromEntries(categories.map((category) => [
+    category,
+    judgments[`player_${category}`]?.verdict === "valid" ? values[category] : ""
+  ])) as Partial<Record<CategoryId, string>>, [categories, judgments, values]);
+
+  const validOpponentValues = useMemo(() => Object.fromEntries(categories.map((category) => [
+    category,
+    judgments[`rival_${category}`]?.verdict === "valid" ? opponentAnswers[category] : ""
+  ])) as Partial<Record<CategoryId, string>>, [categories, judgments, opponentAnswers]);
+
   const answersForScore = useMemo(() => withOpponent
-    ? [{ playerId: "you", values }, { playerId: "rival", values: opponentAnswers }]
-    : [{ playerId: "you", values }], [opponentAnswers, values, withOpponent]);
+    ? [{ playerId: "you", values: validValues }, { playerId: "rival", values: validOpponentValues }]
+    : [{ playerId: "you", values: validValues }], [validOpponentValues, validValues, withOpponent]);
+
   const scores = useMemo(() => scoreAnswers(answersForScore, letter, categories), [answersForScore, categories, letter]);
   const playerPoints = Object.values(scores.you ?? {}).reduce<number>((sum, score) => sum + (score ?? 0), 0);
   const opponentPoints = Object.values(scores.rival ?? {}).reduce<number>((sum, score) => sum + (score ?? 0), 0);
   const allFilled = categories.length > 0 && categories.every((category) => Boolean(values[category]?.trim()));
-  const allValid = categories.length > 0 && categories.every((category) => answerStartsWithLetter(values[category] ?? "", letter));
+  const allStartWithLetter = categories.length > 0 && categories.every((category) => answerStartsWithLetter(values[category] ?? "", letter));
 
   const toggleCategory = (categoryId: CategoryId) => {
     if (!categories.includes(categoryId) && categories.length >= 10) { setError("تقدر تختار ١٠ فئات بحد أقصى."); return; }
@@ -52,6 +66,8 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
 
   const startRound = async (againstAi: boolean, chosenLetter = letter) => {
     setError("");
+    setJudgments({});
+    setJudging(false);
     if (againstAi) {
       const requestId = ++aiRequestId.current;
       setBusy(true);
@@ -93,18 +109,61 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
     onSound("join");
   };
 
-  const finishRound = () => {
+  const finishRound = async () => {
     if (withOpponent && !opponentReady) {
       setError("المنافس لسه بيجهّز إجاباته؛ اكتب إجاباتك وخد ثواني لحد ما يخلص.");
       return;
     }
-    if (!allFilled || !allValid) {
-      setError(!allFilled ? "كمّل كل الخانات الأول." : `اكتب كلمة كاملة من حرفين على الأقل، وتبدأ بحرف ${letter}.`);
+    if (!allFilled) {
+      setError("كمّل كل الخانات الأول.");
       return;
     }
+    if (!allStartWithLetter) {
+      setError(`كل إجابة لازم تكون كلمة من حرفين على الأقل وتبدأ بحرف ${letter}.`);
+      return;
+    }
+
     setError("");
-    setStage("results");
-    onSound(withOpponent && playerPoints > opponentPoints ? "combo" : withOpponent && playerPoints === opponentPoints ? "tie" : "bus");
+    setJudging(true);
+
+    try {
+      const itemsToJudge: Array<{ id: string; category: string; answer: string }> = [];
+      for (const catId of categories) {
+        const cat = CATEGORIES.find((c) => c.id === catId);
+        const label = cat?.label ?? catId;
+        if (values[catId]?.trim()) {
+          itemsToJudge.push({ id: `player_${catId}`, category: label, answer: values[catId]!.trim() });
+        }
+        if (withOpponent && opponentAnswers[catId]?.trim()) {
+          itemsToJudge.push({ id: `rival_${catId}`, category: label, answer: opponentAnswers[catId]!.trim() });
+        }
+      }
+
+      const res = await requestGameAi<{ judgments: Record<string, JudgmentResult> }>({
+        mode: "batch_judge",
+        letter,
+        items: itemsToJudge
+      });
+
+      const returned = res.judgments ?? {};
+      setJudgments(returned);
+
+      const pValid = Object.fromEntries(categories.map((c) => [c, returned[`player_${c}`]?.verdict === "valid" ? values[c] : ""]));
+      const rValid = Object.fromEntries(categories.map((c) => [c, returned[`rival_${c}`]?.verdict === "valid" ? opponentAnswers[c] : ""]));
+      const roundAns = withOpponent
+        ? [{ playerId: "you", values: pValid }, { playerId: "rival", values: rValid }]
+        : [{ playerId: "you", values: pValid }];
+      const roundSc = scoreAnswers(roundAns, letter, categories);
+      const pScore = Object.values(roundSc.you ?? {}).reduce<number>((s, p) => s + (p ?? 0), 0);
+      const rScore = Object.values(roundSc.rival ?? {}).reduce<number>((s, p) => s + (p ?? 0), 0);
+
+      setStage("results");
+      onSound(withOpponent && pScore > rScore ? "combo" : withOpponent && pScore === rScore ? "tie" : "bus");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "تعذّر تحكيم الإجابات بواسطة الذكاء الاصطناعي. جرّب مرة أخرى.");
+    } finally {
+      setJudging(false);
+    }
   };
 
   const newLetter = () => {
@@ -135,15 +194,36 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
           const invalid = Boolean(value.trim() && !answerStartsWithLetter(value, letter));
           return <label className={`answer-field ${value.trim() ? "filled" : ""} ${invalid ? "invalid" : ""}`} key={categoryId}><span><i className="category-icon">{category.icon}</i>{category.label}</span><input value={value} maxLength={80} placeholder={`اكتب ${category.label}...`} onChange={(event) => setValues((current) => ({ ...current, [categoryId]: event.target.value }))} /></label>;
         })}</div>
+        <p className="solo-footnote">يتم تقييم الإجابات بواسطة الذكاء الاصطناعي للتأكد من ملاءمتها للفئة بعد الضغط على أتوبيس كومبليت.</p>
         {error && <div className="solo-error" role="alert">{error}</div>}
-        <div className="solo-game-footer"><button className="btn btn-light" onClick={() => { aiRequestId.current += 1; setBusy(false); setError(""); setStage("setup"); }}><ArrowRight /> إعدادات التدريب</button><button className="btn btn-primary" disabled={withOpponent && !opponentReady} onClick={finishRound}><BusFront /> أتوبيس كومبليت!</button></div>
+        <div className="solo-game-footer"><button className="btn btn-light" disabled={judging} onClick={() => { aiRequestId.current += 1; setBusy(false); setJudging(false); setError(""); setStage("setup"); }}><ArrowRight /> إعدادات التدريب</button><button className="btn btn-primary" disabled={(withOpponent && !opponentReady) || judging} onClick={() => void finishRound()}>{judging ? <><span className="spinner solo-spinner" /> الحكم بيراجع الإجابات...</> : <><BusFront /> أتوبيس كومبليت!</>}</button></div>
       </motion.section>}
 
       {stage === "results" && <motion.section className="room-card solo-card" key={`solo-results-${letter}`} initial={motionEnabled ? { opacity: 0, y: 12 } : false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
         <div className="solo-results-head"><span className="solo-icon"><Trophy /></span><div><span className="section-kicker">خلصت الجولة · الحرف {letter}</span><h2>{withOpponent ? playerPoints > opponentPoints ? "كسبت الجولة!" : playerPoints < opponentPoints ? "المنافس كسب الجولة" : "تعادل جميل!" : "أحسنت، خلصت تدريبك!"}</h2><p>{withOpponent ? `${name}: ${playerPoints} نقطة · المنافس الذكي: ${opponentPoints} نقطة` : `${playerPoints} نقطة في تدريبك`}</p></div></div>
         <div className="solo-result-table"><div className="solo-result-row solo-result-heading"><span>الفئة</span><span>{name}</span>{withOpponent && <span>المنافس</span>}</div>{categories.map((categoryId) => {
           const category = CATEGORIES.find((item) => item.id === categoryId)!;
-          return <div className="solo-result-row" key={categoryId}><span><b>{category.icon}</b>{category.label}</span><span><strong>{values[categoryId] || "—"}</strong><small>{scores.you?.[categoryId] ?? 0} نقطة</small></span>{withOpponent && <span><strong>{opponentAnswers[categoryId] || "—"}</strong><small>{scores.rival?.[categoryId] ?? 0} نقطة</small></span>}</div>;
+          const playerJ = judgments[`player_${categoryId}`];
+          const rivalJ = judgments[`rival_${categoryId}`];
+          const playerValid = playerJ?.verdict === "valid";
+          const rivalValid = rivalJ?.verdict === "valid";
+          return <div className="solo-result-row" key={categoryId}>
+            <span><b>{category.icon}</b>{category.label}</span>
+            <span>
+              <strong>{values[categoryId] || "—"}</strong>
+              <small>
+                {values[categoryId]?.trim() && !playerValid ? <span style={{ color: "#ef4444" }}>غير مقبولة ({playerJ?.reason || "لا تناسب الفئة"}) · </span> : playerValid && playerJ?.reason ? <span style={{ color: "var(--muted)" }}>{playerJ.reason} · </span> : null}
+                {scores.you?.[categoryId] ?? 0} نقطة
+              </small>
+            </span>
+            {withOpponent && <span>
+              <strong>{opponentAnswers[categoryId] || "—"}</strong>
+              <small>
+                {opponentAnswers[categoryId]?.trim() && !rivalValid ? <span style={{ color: "#ef4444" }}>غير مقبولة ({rivalJ?.reason || "لا تناسب الفئة"}) · </span> : rivalValid && rivalJ?.reason ? <span style={{ color: "var(--muted)" }}>{rivalJ.reason} · </span> : null}
+                {scores.rival?.[categoryId] ?? 0} نقطة
+              </small>
+            </span>}
+          </div>;
         })}</div>
         <div className="solo-game-footer"><button className="btn btn-light" onClick={() => { setStage("setup"); setError(""); }}><ArrowRight /> إعدادات التدريب</button><button className="btn btn-primary" onClick={() => void startRound(withOpponent, newLetter())}><RotateCcw /> جولة جديدة</button></div>
       </motion.section>}
