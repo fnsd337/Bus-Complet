@@ -6,9 +6,11 @@ import { useCallback, useEffect, useState } from "react";
 import GameRoom from "@/components/game-room";
 import SoloPractice from "@/components/solo-practice";
 import PlayerAvatar from "@/components/player-avatar";
+import ProfileModal from "@/components/profile-modal";
 import { AVATARS } from "@/lib/game";
 import { ensureUser, getSupabase } from "@/lib/supabase";
 import { playGameSfx } from "@/lib/sfx";
+import { getPlayerProfile, type PlayerProfile } from "@/lib/profile";
 
 type RoomEntry = { id: string; code: string };
 type ModalKind = "create" | "join" | null;
@@ -30,16 +32,45 @@ async function compressAvatar(file: File): Promise<Blob> {
   } finally { URL.revokeObjectURL(source); }
 }
 
+const INITIAL_PROFILE: PlayerProfile = {
+  id: "BUS-PLAYER",
+  name: "اللاعب",
+  avatar: AVATARS[0],
+  wins: 0,
+  winStreak: 0,
+  bestStreak: 0,
+  matchesPlayed: 0,
+  totalScore: 0,
+  createdAt: ""
+};
+
 export default function HomePage() {
   const [room, setRoom] = useState<RoomEntry | null>(null);
   const [soloOpen, setSoloOpen] = useState(false);
   const [modal, setModal] = useState<ModalKind>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState<PlayerProfile>(INITIAL_PROFILE);
+  const [mounted, setMounted] = useState(false);
   const [prefillCode, setPrefillCode] = useState("");
   const [dark, setDark] = useState(false);
   const [sound, setSound] = useState(true);
   const motionEnabled = true;
   const ready = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
   const supabase = getSupabase();
+
+  useEffect(() => {
+    setMounted(true);
+    setProfile(getPlayerProfile());
+    const handleProfileUpdate = () => {
+      setProfile(getPlayerProfile());
+    };
+    window.addEventListener("bus-profile-updated", handleProfileUpdate);
+    window.addEventListener("storage", handleProfileUpdate);
+    return () => {
+      window.removeEventListener("bus-profile-updated", handleProfileUpdate);
+      window.removeEventListener("storage", handleProfileUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     const storedDark = localStorage.getItem("bus-dark") === "true";
@@ -102,7 +133,22 @@ export default function HomePage() {
       </a>
       <nav className="nav-links"><a href="#how">طريقة اللعب</a><a href="#points">النقاط</a><a href="#friends">اللعب مع أصحابك</a></nav>
       <div className="top-actions">
-        <span className="tiny-label">{ready ? "اللعب أونلاين جاهز" : "بانتظار إعداد الاتصال"}</span>
+        <button
+          className="profile-pill-btn"
+          onClick={() => {
+            setProfileOpen(true);
+            playGameSfx(sound, "profile");
+          }}
+          aria-label="الملف الشخصي والإحصائيات"
+        >
+          <PlayerAvatar value={mounted ? profile.avatar : AVATARS[0]} className="profile-btn-avatar" />
+          <span className="profile-btn-name">{mounted ? profile.name : "اللاعب"}</span>
+          {mounted && profile.winStreak > 0 && (
+            <span className="profile-btn-streak" title={`سلسلة انتصارات: ${profile.winStreak}`}>
+              🔥 {profile.winStreak}
+            </span>
+          )}
+        </button>
         <button className="icon-btn" onClick={toggleSound} aria-label={sound ? "إيقاف الصوت" : "تشغيل الصوت"}>{sound ? <Volume2 /> : <VolumeX />}</button>
         <button className="icon-btn" onClick={toggleTheme} aria-label={dark ? "الوضع الفاتح" : "الوضع الداكن"}>{dark ? <Sun /> : <Moon />}</button>
       </div>
@@ -160,7 +206,19 @@ export default function HomePage() {
       <footer className="wrap footer"><div className="footer-brand"><span className="brand-mark"><BusFront /></span><span>أتوبيس كومبليت</span></div><span>لعبة الحروف والتحدّي بين الأصدقاء.</span></footer>
     </>}
 
-    <AnimatePresence>{modal && !room && !soloOpen && <EntryDialog kind={modal} code={prefillCode} onClose={() => setModal(null)} onEnter={enterRoom} ready={ready} sound={sound} motionEnabled={motionEnabled} />}</AnimatePresence>
+    <AnimatePresence>
+      {modal && !room && !soloOpen && <EntryDialog kind={modal} code={prefillCode} onClose={() => setModal(null)} onEnter={enterRoom} ready={ready} sound={sound} motionEnabled={motionEnabled} />}
+      {profileOpen && (
+        <ProfileModal
+          profile={profile}
+          motionEnabled={motionEnabled}
+          sound={sound}
+          onSound={(cue) => playGameSfx(sound, cue)}
+          onClose={() => setProfileOpen(false)}
+          onUpdate={(updated) => setProfile(updated)}
+        />
+      )}
+    </AnimatePresence>
   </MotionConfig></main>;
 }
 

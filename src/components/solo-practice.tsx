@@ -5,6 +5,8 @@ import { ArrowLeft, ArrowRight, Bot, Brain, BusFront, Check, RotateCcw, Sparkles
 import { useEffect, useMemo, useRef, useState } from "react";
 import { answerStartsWithLetter, ARABIC_LETTERS, CATEGORIES, scoreAnswers, type CategoryId } from "@/lib/game";
 import { requestGameAi } from "@/lib/game-ai-client";
+import { getPlayerProfile, recordMatchOutcome, type PlayerProfile } from "@/lib/profile";
+import BusAnimation from "@/components/bus-animation";
 import type { SfxCue } from "@/lib/sfx";
 
 type Difficulty = "casual" | "clever" | "playful";
@@ -31,6 +33,7 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
   const [opponentReady, setOpponentReady] = useState(true);
   const [busy, setBusy] = useState(false);
   const [judging, setJudging] = useState(false);
+  const [showBusAnim, setShowBusAnim] = useState(false);
   const [error, setError] = useState("");
   const aiRequestId = useRef(0);
 
@@ -125,6 +128,8 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
 
     setError("");
     setJudging(true);
+    setShowBusAnim(true);
+    onSound("bus");
 
     try {
       const itemsToJudge: Array<{ id: string; category: string; answer: string }> = [];
@@ -158,7 +163,23 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
       const rScore = Object.values(roundSc.rival ?? {}).reduce<number>((s, p) => s + (p ?? 0), 0);
 
       setStage("results");
-      onSound(withOpponent && pScore > rScore ? "combo" : withOpponent && pScore === rScore ? "tie" : "bus");
+      if (withOpponent) {
+        const won = pScore > rScore;
+        const tied = pScore === rScore;
+        const outcome = recordMatchOutcome({ won, tied, score: pScore });
+        if (won && outcome.profile.winStreak >= 2) {
+          onSound("streak");
+        } else if (won) {
+          onSound("win");
+        } else if (tied) {
+          onSound("tie");
+        } else {
+          onSound("bus");
+        }
+      } else {
+        recordMatchOutcome({ won: false, tied: true, score: pScore });
+        onSound("bus");
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذّر تحكيم الإجابات بواسطة الذكاء الاصطناعي. جرّب مرة أخرى.");
     } finally {
@@ -228,5 +249,6 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
         <div className="solo-game-footer"><button className="btn btn-light" onClick={() => { setStage("setup"); setError(""); }}><ArrowRight /> إعدادات التدريب</button><button className="btn btn-primary" onClick={() => void startRound(withOpponent, newLetter())}><RotateCcw /> جولة جديدة</button></div>
       </motion.section>}
     </AnimatePresence>
+    {showBusAnim && <BusAnimation onComplete={() => setShowBusAnim(false)} />}
   </section>;
 }

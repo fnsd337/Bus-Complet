@@ -1,4 +1,19 @@
-export type SfxCue = "tap" | "join" | "letter" | "bus" | "approve" | "reject" | "win" | "ready" | "reveal" | "combo" | "tie";
+export type SfxCue =
+  | "tap"
+  | "join"
+  | "letter"
+  | "bus"
+  | "approve"
+  | "reject"
+  | "win"
+  | "ready"
+  | "reveal"
+  | "combo"
+  | "tie"
+  | "streak"
+  | "profile"
+  | "badge"
+  | "whoosh";
 
 let audioContext: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -104,9 +119,15 @@ export function playGameSfx(enabled: boolean, cue: SfxCue = "tap") {
       note(context, 554.37, now + .12, .24, { wave: "triangle", volume: .045, cutoff: 2400 });
       break;
     case "bus":
-      note(context, 220, now, .32, { wave: "triangle", volume: .11, cutoff: 1100 });
-      note(context, 329.63, now + .012, .29, { wave: "sine", volume: .085, cutoff: 1800 });
-      softAir(context, now, .22);
+      // Medium authentic double-honk bus horn ("طوط .. طوووط! 📢🚌")
+      // First honk
+      note(context, 233.08, now, .13, { wave: "triangle", volume: .10, cutoff: 1800 });
+      note(context, 293.66, now, .13, { wave: "sawtooth", volume: .065, cutoff: 2200 });
+      // Second honk (longer and punchier)
+      note(context, 233.08, now + .17, .30, { wave: "triangle", volume: .12, cutoff: 2000 });
+      note(context, 293.66, now + .17, .30, { wave: "sawtooth", volume: .08, cutoff: 2400 });
+      // Air brake puff
+      softAir(context, now + .36, .20);
       break;
     case "approve":
       note(context, 523.25, now, .18, { wave: "triangle", volume: .09 });
@@ -122,6 +143,31 @@ export function playGameSfx(enabled: boolean, cue: SfxCue = "tap") {
       note(context, 659.25, now + .09, .31, { wave: "sine", volume: .08 });
       note(context, 783.99, now + .18, .34, { wave: "triangle", volume: .075 });
       note(context, 1046.5, now + .3, .58, { wave: "sine", volume: .08 });
+      break;
+    case "streak":
+      // Ascending energetic fanfare arpeggio with high harmonic shimmer for win streaks
+      note(context, 440, now, .11, { wave: "triangle", volume: .08, cutoff: 3600 });
+      note(context, 554.37, now + .055, .12, { wave: "sine", volume: .08, cutoff: 4000 });
+      note(context, 659.25, now + .11, .14, { wave: "triangle", volume: .085, cutoff: 4200 });
+      note(context, 880, now + .17, .18, { wave: "sine", volume: .09, cutoff: 4500 });
+      note(context, 1108.73, now + .24, .32, { wave: "triangle", volume: .095, cutoff: 5000 });
+      softAir(context, now + .15, .25);
+      break;
+    case "profile":
+      // Smooth welcoming pop chord
+      note(context, 523.25, now, .14, { wave: "triangle", volume: .07, endFrequency: 587, cutoff: 3200 });
+      note(context, 659.25, now + .04, .18, { wave: "sine", volume: .065, cutoff: 3600 });
+      break;
+    case "badge":
+      // Triumphant sparkling celebratory chime
+      note(context, 783.99, now, .12, { wave: "sine", volume: .07, cutoff: 3800 });
+      note(context, 987.77, now + .06, .14, { wave: "triangle", volume: .065, cutoff: 4200 });
+      note(context, 1174.66, now + .12, .16, { wave: "sine", volume: .06, cutoff: 4500 });
+      note(context, 1567.98, now + .18, .36, { wave: "triangle", volume: .07, cutoff: 5200 });
+      break;
+    case "whoosh":
+      softAir(context, now, .18);
+      note(context, 320, now, .15, { wave: "sine", volume: .04, endFrequency: 540, cutoff: 1800 });
       break;
   }
 }

@@ -8,8 +8,10 @@ import {
   type Room, type Round, type Settings
 } from "@/lib/game";
 import PlayerAvatar from "@/components/player-avatar";
+import BusAnimation from "@/components/bus-animation";
 import { ensureUser, getSupabase } from "@/lib/supabase";
 import { requestGameAi } from "@/lib/game-ai-client";
+import { recordMatchOutcome } from "@/lib/profile";
 import type { SfxCue } from "@/lib/sfx";
 
 type RoomState = { room: Room; players: Player[]; rounds: Round[]; answers: Answer[]; votes: AnswerVote[] };
@@ -38,6 +40,8 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   const [newCategory, setNewCategory] = useState("");
   const [aiJudgments, setAiJudgments] = useState<Record<string, AiJudgment>>({});
   const [aiBusyKey, setAiBusyKey] = useState("");
+  const [showBusAnim, setShowBusAnim] = useState(false);
+  const [busCompleterName, setBusCompleterName] = useState("");
   const [values, setValues] = useState<Partial<Record<CategoryId, string>>>({});
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -129,9 +133,27 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
   useEffect(() => {
     if (state?.room.status === "finished" && !winSoundPlayedRef.current) {
       winSoundPlayedRef.current = true;
-      onSound("win");
-    } else if (state?.room.status !== "finished") winSoundPlayedRef.current = false;
-  }, [onSound, state?.room.status]);
+      const amIWinner = rankedPlayers[0]?.user_id === userId;
+      const isTie = matchChampions.some((p) => p.user_id === userId) && matchChampions.length > 1;
+      const outcome = recordMatchOutcome({
+        won: amIWinner && !isTie,
+        tied: isTie,
+        score: me?.total_score ?? 0
+      });
+
+      if (amIWinner && outcome.profile.winStreak >= 2) {
+        onSound("streak");
+      } else if (amIWinner) {
+        onSound("win");
+      } else if (isTie) {
+        onSound("tie");
+      } else {
+        onSound("bus");
+      }
+    } else if (state?.room.status !== "finished") {
+      winSoundPlayedRef.current = false;
+    }
+  }, [matchChampions, me?.total_score, onSound, rankedPlayers, state?.room.status, userId]);
   useEffect(() => {
     if (!state?.room.id) return;
     const heartbeat = () => { void supabase?.rpc("heartbeat_room", { p_room_id: roomId }); };
@@ -156,6 +178,12 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
         const id = Date.now() + Math.random();
         setReactions((current) => [...current, { id, emoji: item.emoji, name: item.name }]);
         window.setTimeout(() => setReactions((current) => current.filter((reaction) => reaction.id !== id)), 2400);
+      })
+      .on("broadcast", { event: "bus_complete" }, ({ payload }) => {
+        const item = payload as { name: string };
+        setShowBusAnim(true);
+        setBusCompleterName(item.name || "لاعب");
+        onSound("bus");
       })
       .subscribe();
     channelRef.current = channel;
@@ -262,7 +290,18 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
       if (saveResult.error && !myAnswer?.locked_at) throw saveResult.error;
       const { error: finishError } = await supabase.rpc("finish_round", { p_room_id: roomId });
       if (finishError) throw finishError;
-      notify("أتوبيس كومبليت! اتقفلت الجولة على الكل."); onSound("bus"); await refresh();
+      if (channelRef.current && me) {
+        void channelRef.current.send({
+          type: "broadcast",
+          event: "bus_complete",
+          payload: { name: me.display_name }
+        });
+      }
+      setShowBusAnim(true);
+      setBusCompleterName(me?.display_name || "أنت");
+      notify("أتوبيس كومبليت! اتقفلت الجولة على الكل.");
+      onSound("bus");
+      await refresh();
     } catch (cause) { notify(getError(cause)); }
     finally { setSubmitting(false); }
   };
@@ -437,6 +476,7 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
     </div>
     <AnimatePresence>{toast && <motion.div className="toast" initial={motionEnabled ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: motionEnabled ? .18 : 0 }}>{toast}</motion.div>}</AnimatePresence>
     {reactions.map((reaction,index) => <div className="reaction-float" key={reaction.id} title={reaction.name} style={{ left: `${20 + (index * 17) % 65}%`, bottom: "28px" }}>{reaction.emoji}</div>)}
+    {showBusAnim && <BusAnimation playerName={busCompleterName} onComplete={() => setShowBusAnim(false)} />}
   </section>;
 }
 
