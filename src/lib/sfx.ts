@@ -80,6 +80,261 @@ function softAir(context: AudioContext, start: number, duration: number) {
   source.stop(start + duration + .02);
 }
 
+function createStereo3D(context: AudioContext, masterNode: GainNode, pan = 0) {
+  if (context.createStereoPanner) {
+    const panner = context.createStereoPanner();
+    panner.pan.setValueAtTime(pan, context.currentTime);
+    panner.connect(masterNode);
+    return panner;
+  }
+  return masterNode;
+}
+
+// 1. Classic Egyptian Bus Dual Air Horn (أتوبيس النصر الكلاسيكي)
+function playClassicBusHorn(context: AudioContext, masterNode: GainNode, start: number) {
+  const leftPan = createStereo3D(context, masterNode, -0.25);
+  const rightPan = createStereo3D(context, masterNode, 0.25);
+
+  const blasts = [
+    { offset: 0, duration: 0.16, gain: 0.24 },
+    { offset: 0.22, duration: 0.46, gain: 0.28 },
+  ];
+
+  const freqs = [146.83, 293.66, 369.99, 440.0];
+
+  for (const blast of blasts) {
+    const blastStart = start + blast.offset;
+    const blastDur = blast.duration;
+
+    const lfo = context.createOscillator();
+    lfo.frequency.setValueAtTime(28, blastStart);
+    const lfoGain = context.createGain();
+    lfoGain.gain.setValueAtTime(8, blastStart);
+    lfo.connect(lfoGain);
+
+    const bellFilter = context.createBiquadFilter();
+    bellFilter.type = "bandpass";
+    bellFilter.frequency.setValueAtTime(1150, blastStart);
+    bellFilter.Q.setValueAtTime(1.8, blastStart);
+
+    const formantFilter = context.createBiquadFilter();
+    formantFilter.type = "peaking";
+    formantFilter.frequency.setValueAtTime(2800, blastStart);
+    formantFilter.gain.setValueAtTime(7, blastStart);
+
+    const envelope = context.createGain();
+    envelope.gain.setValueAtTime(0.0001, blastStart);
+    envelope.gain.linearRampToValueAtTime(blast.gain, blastStart + 0.016);
+    envelope.gain.setValueAtTime(blast.gain * 0.95, blastStart + blastDur - 0.04);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, blastStart + blastDur);
+
+    bellFilter.connect(formantFilter);
+    formantFilter.connect(envelope);
+    envelope.connect(leftPan);
+    envelope.connect(rightPan);
+
+    for (let i = 0; i < freqs.length; i++) {
+      const osc = context.createOscillator();
+      osc.type = i === 0 ? "triangle" : "sawtooth";
+      osc.frequency.setValueAtTime(freqs[i], blastStart);
+      osc.frequency.setValueAtTime(freqs[i], blastStart + blastDur - 0.05);
+      osc.frequency.linearRampToValueAtTime(freqs[i] * 0.96, blastStart + blastDur);
+
+      lfoGain.connect(osc.frequency);
+      osc.connect(bellFilter);
+      osc.start(blastStart);
+      osc.stop(blastStart + blastDur + 0.02);
+    }
+
+    lfo.start(blastStart);
+    lfo.stop(blastStart + blastDur + 0.02);
+  }
+
+  softAir(context, start + 0.62, 0.28);
+}
+
+// 2. Cairo Microbus Twin Disc Electric Horn (ميكروباص الدائري - تيت تييييت حاد وسريع)
+function playMicrobusHorn(context: AudioContext, masterNode: GainNode, start: number) {
+  const panner = createStereo3D(context, masterNode, 0.15);
+  const blasts = [
+    { offset: 0, duration: 0.12, gain: 0.26 },
+    { offset: 0.16, duration: 0.32, gain: 0.28 },
+  ];
+
+  // High-tone disc chord: 420Hz + 510Hz + 840Hz
+  const freqs = [420, 510, 840];
+
+  for (const blast of blasts) {
+    const bStart = start + blast.offset;
+    const bDur = blast.duration;
+
+    const filter = context.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(1450, bStart);
+    filter.Q.setValueAtTime(2.2, bStart);
+
+    const env = context.createGain();
+    env.gain.setValueAtTime(0.0001, bStart);
+    env.gain.linearRampToValueAtTime(blast.gain, bStart + 0.008);
+    env.gain.setValueAtTime(blast.gain * 0.9, bStart + bDur - 0.02);
+    env.gain.exponentialRampToValueAtTime(0.0001, bStart + bDur);
+
+    filter.connect(env);
+    env.connect(panner);
+
+    for (const f of freqs) {
+      const osc = context.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(f, bStart);
+      osc.connect(filter);
+      osc.start(bStart);
+      osc.stop(bStart + bDur + 0.01);
+    }
+  }
+}
+
+// 3. Squeaky Musical TokTok Bulb Horn (توك توك بطوطة بييب بييب مضحك)
+function playTokTokHorn(context: AudioContext, masterNode: GainNode, start: number) {
+  const panner = createStereo3D(context, masterNode, -0.18);
+  const honks = [
+    { offset: 0, dur: 0.15, base: 760 },
+    { offset: 0.18, dur: 0.22, base: 820 },
+  ];
+
+  for (const h of honks) {
+    const hStart = start + h.offset;
+    const osc = context.createOscillator();
+    const env = context.createGain();
+
+    osc.type = "triangle";
+    // Pitch drops comically like a rubber squeeze bulb: 820 -> 540
+    osc.frequency.setValueAtTime(h.base, hStart);
+    osc.frequency.linearRampToValueAtTime(h.base * 1.08, hStart + 0.03);
+    osc.frequency.exponentialRampToValueAtTime(h.base * 0.72, hStart + h.dur);
+
+    env.gain.setValueAtTime(0.001, hStart);
+    env.gain.linearRampToValueAtTime(0.25, hStart + 0.015);
+    env.gain.exponentialRampToValueAtTime(0.001, hStart + h.dur);
+
+    osc.connect(env);
+    env.connect(panner);
+
+    osc.start(hStart);
+    osc.stop(hStart + h.dur + 0.02);
+  }
+}
+
+// 4. London Red Double Decker Majestic Chime (أتوبيس أحمر إنجليزي فخم)
+function playLondonHorn(context: AudioContext, masterNode: GainNode, start: number) {
+  const left = createStereo3D(context, masterNode, -0.3);
+  const right = createStereo3D(context, masterNode, 0.3);
+
+  // Majestic cathedral baritone triad: F2 (87Hz), C3 (130Hz), F3 (174Hz), A3 (220Hz)
+  const freqs = [87.31, 130.81, 174.61, 220.0];
+  const dur = 0.58;
+
+  const env = context.createGain();
+  env.gain.setValueAtTime(0.001, start);
+  env.gain.linearRampToValueAtTime(0.32, start + 0.04);
+  env.gain.setValueAtTime(0.28, start + dur - 0.1);
+  env.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+
+  const filter = context.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(850, start);
+  filter.Q.setValueAtTime(1.5, start);
+
+  env.connect(left);
+  env.connect(right);
+
+  for (const f of freqs) {
+    const osc = context.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(f, start);
+    osc.connect(filter);
+    osc.start(start);
+    osc.stop(start + dur + 0.02);
+  }
+  filter.connect(env);
+  softAir(context, start + 0.45, 0.25);
+}
+
+// 5. Cyberpunk Gold 2077 Warp Horn (أتوبيس المستقبل الذهبي - نفاث فضائي هايبر)
+function playCyberHorn(context: AudioContext, masterNode: GainNode, start: number) {
+  const left = createStereo3D(context, masterNode, -0.4);
+  const right = createStereo3D(context, masterNode, 0.4);
+
+  const osc1 = context.createOscillator();
+  const osc2 = context.createOscillator();
+  const filter = context.createBiquadFilter();
+  const env = context.createGain();
+
+  osc1.type = "sawtooth";
+  osc2.type = "triangle";
+
+  // Futuristic laser warp pitch sweep
+  osc1.frequency.setValueAtTime(240, start);
+  osc1.frequency.exponentialRampToValueAtTime(960, start + 0.25);
+  osc1.frequency.linearRampToValueAtTime(440, start + 0.55);
+
+  osc2.frequency.setValueAtTime(120, start);
+  osc2.frequency.exponentialRampToValueAtTime(480, start + 0.25);
+  osc2.frequency.linearRampToValueAtTime(220, start + 0.55);
+
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(600, start);
+  filter.frequency.exponentialRampToValueAtTime(3200, start + 0.25);
+  filter.frequency.exponentialRampToValueAtTime(800, start + 0.55);
+  filter.Q.setValueAtTime(4.5, start);
+
+  env.gain.setValueAtTime(0.001, start);
+  env.gain.linearRampToValueAtTime(0.28, start + 0.03);
+  env.gain.setValueAtTime(0.24, start + 0.4);
+  env.gain.exponentialRampToValueAtTime(0.0001, start + 0.56);
+
+  osc1.connect(filter);
+  osc2.connect(filter);
+  filter.connect(env);
+  env.connect(left);
+  env.connect(right);
+
+  osc1.start(start);
+  osc2.start(start);
+  osc1.stop(start + 0.58);
+  osc2.stop(start + 0.58);
+}
+
+export function playVehicleHorn(enabled: boolean, vehicleId = "classic_bus") {
+  if (!enabled) return;
+  const context = getAudioContext();
+  if (!context || !master) return;
+  void context.resume();
+  const now = context.currentTime + 0.008;
+
+  switch (vehicleId) {
+    case "cairo_microbus":
+      playMicrobusHorn(context, master, now);
+      break;
+    case "fire_toktok":
+      playTokTokHorn(context, master, now);
+      break;
+    case "london_red":
+      playLondonHorn(context, master, now);
+      break;
+    case "cyber_gold":
+      playCyberHorn(context, master, now);
+      break;
+    case "classic_bus":
+    default:
+      playClassicBusHorn(context, master, now);
+      break;
+  }
+}
+
+function playBusAirHorn(context: AudioContext, masterNode: GainNode, start: number) {
+  playClassicBusHorn(context, masterNode, start);
+}
+
 export function playGameSfx(enabled: boolean, cue: SfxCue = "tap") {
   if (!enabled) return;
   const context = getAudioContext();
@@ -119,15 +374,7 @@ export function playGameSfx(enabled: boolean, cue: SfxCue = "tap") {
       note(context, 554.37, now + .12, .24, { wave: "triangle", volume: .045, cutoff: 2400 });
       break;
     case "bus":
-      // Medium authentic double-honk bus horn ("طوط .. طوووط! 📢🚌")
-      // First honk
-      note(context, 233.08, now, .13, { wave: "triangle", volume: .10, cutoff: 1800 });
-      note(context, 293.66, now, .13, { wave: "sawtooth", volume: .065, cutoff: 2200 });
-      // Second honk (longer and punchier)
-      note(context, 233.08, now + .17, .30, { wave: "triangle", volume: .12, cutoff: 2000 });
-      note(context, 293.66, now + .17, .30, { wave: "sawtooth", volume: .08, cutoff: 2400 });
-      // Air brake puff
-      softAir(context, now + .36, .20);
+      playVehicleHorn(enabled, typeof window !== "undefined" ? localStorage.getItem("bus-equipped-vehicle") || "classic_bus" : "classic_bus");
       break;
     case "approve":
       note(context, 523.25, now, .18, { wave: "triangle", volume: .09 });

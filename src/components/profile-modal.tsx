@@ -1,11 +1,18 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Award, Camera, Check, Copy, Flame, Play, Sparkles, Trophy, User, X, Zap } from "lucide-react";
+import { Award, Camera, Check, Copy, Flame, Lock, Play, Sparkles, Trophy, User, X, Zap } from "lucide-react";
 import { useState } from "react";
 import PlayerAvatar from "@/components/player-avatar";
 import { AVATARS } from "@/lib/game";
-import { getPlayerProfile, getPlayerRank, savePlayerProfile, type PlayerProfile } from "@/lib/profile";
+import {
+  getAllBadgesWithStatus,
+  getPlayerProfile,
+  getPlayerRank,
+  savePlayerProfile,
+  trackProfileEdit,
+  type PlayerProfile,
+} from "@/lib/profile";
 import type { SfxCue } from "@/lib/sfx";
 
 type ProfileModalProps = {
@@ -23,17 +30,20 @@ export default function ProfileModal({
   sound,
   onSound,
   onClose,
-  onUpdate
+  onUpdate,
 }: ProfileModalProps) {
   const [name, setName] = useState(profile.name);
   const [avatar, setAvatar] = useState(profile.avatar);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"stats" | "edit">("stats");
+  const [activeTab, setActiveTab] = useState<"stats" | "badges" | "edit">("stats");
+  const [badgeFilter, setBadgeFilter] = useState<"all" | "unlocked" | "locked">("all");
   const [savedToast, setSavedToast] = useState(false);
 
   const rank = getPlayerRank(profile.wins, profile.winStreak);
   const hasSavedPhoto = /^https?:\/\//i.test(avatar);
+  const badges = getAllBadgesWithStatus();
+  const unlockedCount = badges.filter((b) => b.isUnlocked).length;
 
   const copyId = async () => {
     try {
@@ -52,6 +62,10 @@ export default function ProfileModal({
     onUpdate(updated);
     setSavedToast(true);
     onSound("badge");
+    const secretBadge = trackProfileEdit();
+    if (secretBadge) {
+      onSound("badge");
+    }
     setTimeout(() => setSavedToast(false), 2000);
   };
 
@@ -61,6 +75,10 @@ export default function ProfileModal({
     const updated = savePlayerProfile({ avatar: chosen });
     onUpdate(updated);
     onSound("tap");
+    const secretBadge = trackProfileEdit();
+    if (secretBadge) {
+      onSound("badge");
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,6 +91,10 @@ export default function ProfileModal({
     const updated = savePlayerProfile({ avatar: url });
     onUpdate(updated);
     onSound("badge");
+    const secretBadge = trackProfileEdit();
+    if (secretBadge) {
+      onSound("badge");
+    }
   };
 
   return (
@@ -139,7 +161,16 @@ export default function ProfileModal({
               onSound("tap");
             }}
           >
-            <Trophy size={15} /> الإحصائيات والأرقام
+            <Trophy size={14} /> الإحصائيات
+          </button>
+          <button
+            className={`profile-tab ${activeTab === "badges" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("badges");
+              onSound("badge");
+            }}
+          >
+            <Award size={14} /> ألقاب سرية ({unlockedCount}/{badges.length})
           </button>
           <button
             className={`profile-tab ${activeTab === "edit" ? "active" : ""}`}
@@ -148,7 +179,7 @@ export default function ProfileModal({
               onSound("tap");
             }}
           >
-            <User size={15} /> تعديل الحساب والصورة
+            <User size={14} /> تعديل الحساب
           </button>
         </div>
 
@@ -222,6 +253,105 @@ export default function ProfileModal({
                 </div>
               </div>
               <span className="profile-total-points">{profile.totalScore} ⭐</span>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === "badges" && (
+          <motion.div
+            className="profile-tab-content"
+            initial={motionEnabled ? { opacity: 0, y: 8 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="badges-header-summary">
+              <div className="badges-progress-text">
+                <strong>🎖️ إنجازات وألقاب الأتوبيس السرية</strong>
+                <small>
+                  فتحت {unlockedCount} من أصل {badges.length} لقب ({Math.round((unlockedCount / badges.length) * 100)}%)
+                </small>
+              </div>
+              <div className="badges-progress-bar-bg">
+                <div
+                  className="badges-progress-bar-fill"
+                  style={{ width: `${(unlockedCount / badges.length) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="badges-filter-bar">
+              <button
+                className={`choice-chip ${badgeFilter === "all" ? "selected" : ""}`}
+                onClick={() => {
+                  setBadgeFilter("all");
+                  onSound("tap");
+                }}
+              >
+                الكل ({badges.length})
+              </button>
+              <button
+                className={`choice-chip ${badgeFilter === "unlocked" ? "selected" : ""}`}
+                onClick={() => {
+                  setBadgeFilter("unlocked");
+                  onSound("tap");
+                }}
+              >
+                المفتوحة ({unlockedCount}) ✓
+              </button>
+              <button
+                className={`choice-chip ${badgeFilter === "locked" ? "selected" : ""}`}
+                onClick={() => {
+                  setBadgeFilter("locked");
+                  onSound("tap");
+                }}
+              >
+                المتبقية ({badges.length - unlockedCount}) 🔒
+              </button>
+            </div>
+
+            <div className="secret-badges-grid">
+              {badges
+                .filter((b) => {
+                  if (badgeFilter === "unlocked") return b.isUnlocked;
+                  if (badgeFilter === "locked") return !b.isUnlocked;
+                  return true;
+                })
+                .map((badge) => (
+                  <motion.div
+                    key={badge.id}
+                    className={`badge-card ${badge.isUnlocked ? "unlocked" : "locked"}`}
+                    whileHover={motionEnabled ? { y: -2, scale: 1.01 } : undefined}
+                  >
+                    <div
+                      className="badge-icon-wrap"
+                      style={{
+                        borderColor: badge.isUnlocked ? badge.color : "var(--line)",
+                        background: badge.isUnlocked
+                          ? `color-mix(in srgb, ${badge.color} 15%, var(--paper))`
+                          : "var(--paper)",
+                      }}
+                    >
+                      <span className="badge-icon-char">{badge.isUnlocked ? badge.icon : <Lock size={16} />}</span>
+                    </div>
+                    <div className="badge-info">
+                      <div className="badge-title-row">
+                        <strong className="badge-title">{badge.title}</strong>
+                        {badge.isUnlocked ? (
+                          <span className="badge-status-pill unlocked">تم الفتح ✓</span>
+                        ) : (
+                          <span className="badge-status-pill locked">لقب مقفول 🔒</span>
+                        )}
+                      </div>
+                      <p className="badge-desc">{badge.description}</p>
+                      <div className="badge-unlock-guide">
+                        <span className="badge-guide-icon">🎯</span>
+                        <span className="badge-guide-text">
+                          <strong>طريقة الحصول عليه:</strong> {badge.howToUnlock || badge.hint}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
             </div>
           </motion.div>
         )}

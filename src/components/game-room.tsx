@@ -11,7 +11,7 @@ import PlayerAvatar from "@/components/player-avatar";
 import BusAnimation from "@/components/bus-animation";
 import { ensureUser, getSupabase } from "@/lib/supabase";
 import { requestGameAi } from "@/lib/game-ai-client";
-import { recordMatchOutcome } from "@/lib/profile";
+import { checkAndUnlockBadges, recordMatchOutcome } from "@/lib/profile";
 import type { SfxCue } from "@/lib/sfx";
 
 type RoomState = { room: Room; players: Player[]; rounds: Round[]; answers: Answer[]; votes: AnswerVote[] };
@@ -141,7 +141,21 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
         score: me?.total_score ?? 0
       });
 
-      if (amIWinner && outcome.profile.winStreak >= 2) {
+      const secondPlayer = rankedPlayers[1];
+      const myScore = me?.total_score ?? 0;
+      const secondScore = secondPlayer?.total_score ?? 0;
+      const closeWin = amIWinner && secondPlayer && (myScore - secondScore <= 15) && (myScore - secondScore > 0);
+
+      const unlockedBadges = checkAndUnlockBadges({
+        streak: outcome.profile.winStreak,
+        closeWin: Boolean(closeWin),
+        totalScore: outcome.profile.totalScore
+      });
+
+      if (unlockedBadges.length > 0) {
+        notify(`🎉 مبروك! فتحت لقب سرّي: ${unlockedBadges[0].icon} ${unlockedBadges[0].title}`);
+        onSound("badge");
+      } else if (amIWinner && outcome.profile.winStreak >= 2) {
         onSound("streak");
       } else if (amIWinner) {
         onSound("win");
@@ -301,6 +315,16 @@ export default function GameRoom({ roomId, roomCode, sound, motionEnabled, onSou
       setBusCompleterName(me?.display_name || "أنت");
       notify("أتوبيس كومبليت! اتقفلت الجولة على الكل.");
       onSound("bus");
+
+      if (currentRound?.started_at) {
+        const durationMs = Date.now() - new Date(currentRound.started_at).getTime();
+        const unlocked = checkAndUnlockBadges({ durationMs });
+        if (unlocked.length > 0) {
+          notify(`🎉 مبروك! فتحت لقب سرّي: ${unlocked[0].icon} ${unlocked[0].title}`);
+          onSound("badge");
+        }
+      }
+
       await refresh();
     } catch (cause) { notify(getError(cause)); }
     finally { setSubmitting(false); }

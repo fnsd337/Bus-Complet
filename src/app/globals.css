@@ -533,6 +533,78 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 /* ==================== Player Profile & Stats Styles ==================== */
+.garage-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 4px 14px 4px 10px;
+  border: 1.5px solid #f59e0b;
+  border-radius: 999px;
+  background: color-mix(in srgb, #f59e0b 12%, var(--paper));
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--hard-shadow);
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.garage-pill-btn:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, #f59e0b 22%, var(--paper));
+  border-color: #d97706;
+}
+.garage-pill-icon {
+  font-size: 17px;
+}
+.garage-pill-title {
+  font-weight: 850;
+}
+.garage-pill-score {
+  font-size: 11px;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-weight: 800;
+  border: 1px solid #fde68a;
+}
+.garage-pill-btn.has-unlock-alert {
+  border-color: #f59e0b;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4), 2px 2px 0 var(--hard-shadow);
+  animation: glow-pulse 2s infinite ease-in-out;
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.3), 2px 2px 0 var(--hard-shadow); }
+  50% { box-shadow: 0 0 16px rgba(245, 158, 11, 0.65), 2px 2px 0 var(--hard-shadow); }
+}
+.garage-new-badge-pulse {
+  font-size: 10px;
+  font-weight: 850;
+  background: #ea580c;
+  color: #ffffff;
+  padding: 2px 7px;
+  border-radius: 999px;
+  animation: badge-bounce 1.5s infinite alternate ease-in-out;
+}
+@keyframes badge-bounce {
+  0% { transform: scale(0.96); }
+  100% { transform: scale(1.05); }
+}
+.hero-unlock-badge {
+  font-size: 10px;
+  font-weight: 850;
+  background: #ea580c;
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-right: 4px;
+}
+.animated-counter-num {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.15s ease;
+}
 .profile-pill-btn {
   display: inline-flex;
   align-items: center;
@@ -852,8 +924,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(1.5px);
+  background: rgba(0, 0, 0, 0.08);
 }
 .bus-speed-lines {
   position: absolute;
@@ -865,6 +936,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     rgba(255, 255, 255, 0.08) 40px,
     rgba(255, 255, 255, 0.08) 80px
   );
+  pointer-events: none;
 }
 .bus-mover {
   position: relative;
@@ -875,17 +947,30 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .bus-callout-banner {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 8px 18px;
-  margin-bottom: 12px;
+  gap: 8px;
+  padding: 8px 20px;
+  margin-bottom: 14px;
   background: #facc15;
   color: #1e293b;
   border: 3px solid #0f172a;
   border-radius: 999px;
   box-shadow: 4px 4px 0 #0f172a;
   white-space: nowrap;
+}
+.bus-banner-horn-icon {
+  font-size: 22px;
+  animation: horn-shake 0.4s infinite alternate ease-in-out;
+}
+@keyframes horn-shake {
+  0% { transform: rotate(-8deg) scale(0.95); }
+  100% { transform: rotate(8deg) scale(1.1); }
+}
+.bus-banner-text-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.25;
 }
 .bus-callout-title {
   font-size: 19px;
@@ -897,18 +982,47 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-weight: 800;
   color: #475569;
 }
+.bus-vehicle-container {
+  position: relative;
+}
 .bus-vehicle {
   position: relative;
-  width: 260px;
-  height: 120px;
+  width: 270px;
+  height: 122px;
+}
+.bus-horn-waves {
+  position: absolute;
+  top: 48px;
+  left: -28px;
+  width: 28px;
+  height: 34px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+.horn-ring {
+  position: absolute;
+  border: 3px solid #fbbf24;
+  border-radius: 50%;
+  clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+}
+.horn-ring.r1 {
+  width: 18px;
+  height: 24px;
+  left: 0;
+}
+.horn-ring.r2 {
+  width: 30px;
+  height: 36px;
+  left: -8px;
 }
 .bus-headlight-beam {
   position: absolute;
-  top: 60px;
-  left: -130px;
-  width: 140px;
-  height: 48px;
-  background: linear-gradient(to left, rgba(254, 240, 138, 0.55), transparent);
+  top: 62px;
+  left: -140px;
+  width: 150px;
+  height: 52px;
+  background: linear-gradient(to left, rgba(254, 240, 138, 0.6), transparent);
   clip-path: polygon(100% 30%, 0 0, 0 100%, 100% 70%);
   pointer-events: none;
 }
@@ -917,24 +1031,44 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   top: 0;
   left: 0;
   width: 100%;
-  height: 98px;
+  height: 100px;
   background: linear-gradient(180deg, #10b981 0%, #059669 65%, #047857 100%);
   border: 3.5px solid #0f172a;
   border-radius: 28px 16px 14px 22px;
   box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.4);
   overflow: hidden;
 }
-.bus-destination-sign {
+.bus-roof-rack {
   position: absolute;
   top: 6px;
-  left: 18px;
-  padding: 2px 8px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.roof-beacon {
+  width: 9px;
+  height: 9px;
+  background: #f59e0b;
+  border: 2px solid #0f172a;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #f59e0b;
+}
+.bus-destination-sign {
+  flex: 1;
+  text-align: center;
+  padding: 1px 6px;
   background: #0f172a;
   color: #fbbf24;
   border-radius: 5px;
   font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .bus-windows-row {
   position: absolute;
@@ -945,28 +1079,54 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   gap: 7px;
 }
 .bus-window {
+  position: relative;
   flex: 1;
   height: 38px;
-  background: #e0f2fe;
+  background: #bae6fd;
   border: 2px solid #0f172a;
   border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.12);
 }
 .driver-window {
   border-radius: 12px 6px 6px 6px;
-  background: #bae6fd;
+  background: #93c5fd;
 }
-.bus-passenger {
-  font-size: 20px;
-  animation: passenger-bounce 0.5s infinite alternate ease-in-out;
+.rear-window {
+  border-radius: 6px 10px 6px 6px;
 }
-@keyframes passenger-bounce {
-  0% { transform: translateY(1px); }
-  100% { transform: translateY(-2px); }
+.window-glare {
+  position: absolute;
+  inset: -10px -2px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.75) 0%,
+    rgba(255, 255, 255, 0.3) 25%,
+    transparent 55%
+  );
+  pointer-events: none;
+}
+.steering-wheel-silhouette {
+  position: absolute;
+  bottom: 3px;
+  left: 4px;
+  width: 14px;
+  height: 10px;
+  border: 2.5px solid #1e293b;
+  border-top-left-radius: 9px;
+  border-top-right-radius: 9px;
+  border-bottom: none;
+  opacity: 0.75;
+}
+.window-curtain {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 7px;
+  height: 60%;
+  background: #f59e0b;
+  border-bottom-left-radius: 4px;
+  opacity: 0.85;
 }
 .bus-stripe {
   position: absolute;
@@ -981,6 +1141,34 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .stripe-gold {
   bottom: 11px;
   background: #fbbf24;
+}
+.bus-door-crease {
+  position: absolute;
+  bottom: 0;
+  right: 68px;
+  width: 2px;
+  height: 48px;
+  background: #064e3b;
+}
+.bus-front-grill {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  width: 12px;
+  height: 20px;
+  background: #1e293b;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 2px;
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
+}
+.grill-line {
+  height: 2px;
+  background: #94a3b8;
+  border-radius: 1px;
 }
 .bus-front-light {
   position: absolute;
@@ -1005,17 +1193,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .bus-wheels-wrapper {
   position: absolute;
-  bottom: 4px;
-  left: 32px;
-  right: 36px;
+  bottom: 3px;
+  left: 34px;
+  right: 38px;
   display: flex;
   justify-content: space-between;
 }
 .bus-wheel {
-  width: 38px;
-  height: 38px;
+  position: relative;
+  width: 40px;
+  height: 40px;
   background: #1e293b;
-  border: 3px solid #0f172a;
+  border: 3.5px solid #0f172a;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1023,36 +1212,1418 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
 }
 .wheel-rim {
-  width: 14px;
-  height: 14px;
+  position: relative;
+  width: 18px;
+  height: 18px;
   background: #94a3b8;
   border: 2px solid #475569;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wheel-spoke {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: #475569;
+}
+.wheel-spoke.s1 {
+  transform: rotate(0deg);
+}
+.wheel-spoke.s2 {
+  transform: rotate(90deg);
+}
+.wheel-center-bolt {
+  position: relative;
+  z-index: 2;
+  width: 6px;
+  height: 6px;
+  background: #0f172a;
   border-radius: 50%;
 }
 .bus-smoke-trail {
   position: absolute;
   bottom: 16px;
-  right: -36px;
+  right: -32px;
   display: flex;
   gap: 2px;
-  font-size: 20px;
+  font-size: 22px;
+  pointer-events: none;
 }
-.smoke-puff.p1 {
-  transform: scale(0.85);
+.smoke-puff {
+  display: inline-block;
 }
-.smoke-puff.p2 {
-  transform: scale(1.15) translateY(-4px);
+.bus-road-container {
+  width: 360px;
+  margin-top: -4px;
+  position: relative;
 }
-.bus-road-line {
-  width: 320px;
-  height: 4px;
-  margin-top: -3px;
-  background: repeating-linear-gradient(
+.bus-road-line-moving {
+  width: 100%;
+  height: 5px;
+  background-image: repeating-linear-gradient(
     90deg,
-    #0f172a,
-    #0f172a 16px,
-    transparent 16px,
-    transparent 28px
+    #0f172a 0px,
+    #0f172a 20px,
+    transparent 20px,
+    transparent 36px
   );
-  opacity: 0.55;
+  opacity: 0.65;
+  border-radius: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Secret Badges (الألقاب والإنجازات السرية)
+   ══════════════════════════════════════════════════════════════════════ */
+.badges-header-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--forest) 8%, var(--paper));
+  border: 2px solid var(--forest);
+  border-radius: 14px;
+  margin-bottom: 14px;
+}
+.badges-progress-text {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.badges-progress-text strong {
+  font-size: 14px;
+  color: var(--ink);
+}
+.badges-progress-text small {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--forest);
+}
+.badges-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.badges-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--forest), #f59e0b);
+  border-radius: 999px;
+  transition: width 0.4s ease-out;
+}
+.secret-badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.badge-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: var(--paper);
+  transition: all 0.2s ease;
+  position: relative;
+}
+.badge-card.unlocked {
+  border-color: color-mix(in srgb, var(--forest) 45%, var(--line));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+.badge-card.locked {
+  opacity: 0.78;
+  border-style: dashed;
+  background: color-mix(in srgb, var(--line) 15%, var(--paper));
+}
+.badge-icon-wrap {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+.badge-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.badge-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.badge-title {
+  font-size: 14px;
+  font-weight: 850;
+  color: var(--ink);
+}
+.badge-status-pill {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badge-status-pill.unlocked {
+  background: color-mix(in srgb, #10b981 18%, transparent);
+  color: #047857;
+  border: 1px solid #10b981;
+}
+.badge-status-pill.locked {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+  border: 1px solid #94a3b8;
+}
+.badge-desc {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+.badges-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.badges-filter-bar .choice-chip {
+  padding: 5px 12px;
+  font-size: 11.5px;
+}
+.badge-unlock-guide {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--forest) 8%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--forest) 25%, transparent);
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.badge-card.locked .badge-unlock-guide {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+.badge-guide-icon {
+  font-size: 13px;
+  line-height: 1.2;
+}
+.badge-guide-text strong {
+  color: var(--forest);
+  margin-left: 2px;
+}
+.badge-card.locked .badge-guide-text strong {
+  color: #ea580c;
+}
+
+.badge-toast-alert {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 22px;
+  background: #0f172a;
+  color: #ffffff;
+  border: 2px solid #fbbf24;
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 15px rgba(251, 191, 36, 0.4);
+  pointer-events: none;
+}
+.badge-toast-icon {
+  font-size: 26px;
+  animation: badge-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes badge-pop {
+  0% { transform: scale(0) rotate(-45deg); }
+  60% { transform: scale(1.3) rotate(15deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.badge-toast-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.badge-toast-text strong {
+  font-size: 14px;
+  font-weight: 850;
+  color: #facc15;
+}
+.badge-toast-text small {
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Bus Garage & 360 Turntable Showroom (جراج الأتوبيسات)
+   ══════════════════════════════════════════════════════════════════════ */
+.garage-page {
+  padding-top: 24px;
+  padding-bottom: 60px;
+}
+.garage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.garage-title-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.garage-title-group h1 {
+  font-size: 24px;
+  margin: 0;
+  color: var(--ink);
+}
+.garage-title-group p {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.garage-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.garage-points-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, #f59e0b 16%, var(--paper));
+  border: 2px solid #f59e0b;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.garage-points-pill strong {
+  color: #b45309;
+  font-size: 15px;
+}
+.garage-main-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .garage-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 360 Showroom Stage Card */
+.garage-showroom-card {
+  position: relative;
+  background: radial-gradient(circle at 50% 20%, #1e293b 0%, #0f172a 100%);
+  border: 3px solid #334155;
+  border-radius: 24px;
+  padding: 24px 20px 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+.showroom-lighting-beam {
+  position: absolute;
+  top: -80px;
+  left: 20%;
+  right: 20%;
+  height: 220px;
+  background: radial-gradient(ellipse at top, rgba(251, 191, 36, 0.25) 0%, transparent 70%);
+  pointer-events: none;
+}
+.showroom-badge-pill {
+  position: relative;
+  z-index: 2;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  border-radius: 999px;
+  color: #ffffff;
+}
+.showroom-tag {
+  font-size: 11px;
+  font-weight: 800;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.showroom-name {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+/* 3D Scene Viewport & Interactive Drag */
+.showroom-scene-viewport {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1200px;
+  min-height: 290px;
+  position: relative;
+  margin: 10px 0;
+  cursor: grab;
+  user-select: none;
+  touch-action: pan-y;
+}
+.showroom-scene-viewport.dragging {
+  cursor: grabbing;
+}
+.showroom-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 2;
+  margin-bottom: 4px;
+}
+.showroom-angle-pill {
+  padding: 4px 10px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #38bdf8;
+}
+.showroom-spotlight-top {
+  position: absolute;
+  top: -90px;
+  left: 25%;
+  right: 25%;
+  height: 200px;
+  background: radial-gradient(ellipse at top, rgba(254, 240, 138, 0.35) 0%, transparent 70%);
+  pointer-events: none;
+}
+.showroom-ambient-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: background 0.4s ease;
+}
+.showroom-drag-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+/* 3D Turntable Assembly */
+.showroom-pedestal-assembly {
+  position: relative;
+  width: 290px;
+  height: 290px;
+  transform-style: preserve-3d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Turntable Cylinder Platform */
+.pedestal-cylinder-base {
+  position: absolute;
+  width: 270px;
+  height: 270px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #1e293b 0%, #090d16 80%);
+  border: 4px solid #38bdf8;
+  transform: rotateX(80deg) translateZ(-45px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.pedestal-perimeter-ticks {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.25);
+}
+.pedestal-metal-plate {
+  position: absolute;
+  inset: 24px;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle,
+    #1e293b 0px,
+    #1e293b 10px,
+    #0f172a 10px,
+    #0f172a 20px
+  );
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+.pedestal-center-medallion {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 2px solid #fbbf24;
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pedestal-center-medallion span {
+  font-size: 7px;
+  font-weight: 900;
+  color: #fbbf24;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+/* Model Mount & Shadow */
+.pedestal-model-mount {
+  position: relative;
+  transform-style: preserve-3d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.model-ground-shadow {
+  position: absolute;
+  bottom: -22px;
+  width: 230px;
+  height: 44px;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.75) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+/* Universal Base Vehicle Shell */
+.v-model {
+  position: relative;
+  width: 234px;
+  height: 108px;
+  border: 3.5px solid #0f172a;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.5), inset 0 3px 0 rgba(255, 255, 255, 0.4);
+  transition: all 0.3s ease;
+}
+
+/* ═════════ 1. Classic Bus Model ═════════ */
+.v-model.bus-classic {
+  border-radius: 24px 14px 10px 18px;
+}
+.bus-roof-plate {
+  position: absolute;
+  top: 5px;
+  left: 12px;
+  right: 12px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+.roof-beacon-dot {
+  width: 6px;
+  height: 6px;
+  background: #ef4444;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #ef4444;
+}
+.roof-plate-text {
+  font-size: 8px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: 0.03em;
+}
+.bus-glass-deck {
+  position: absolute;
+  top: 25px;
+  left: 8px;
+  right: 10px;
+  height: 35px;
+  display: flex;
+  gap: 5px;
+}
+.glass-pane {
+  position: relative;
+  flex: 1;
+  background: #bae6fd;
+  border: 2px solid #0f172a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.glass-pane.driver-pane {
+  border-top-left-radius: 12px;
+  background: #7dd3fc;
+}
+.glass-pane.rear-pane {
+  border-top-right-radius: 8px;
+}
+.glass-reflection-streak {
+  position: absolute;
+  inset: -8px -4px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, transparent 60%);
+  pointer-events: none;
+}
+.model-steering-wheel {
+  position: absolute;
+  bottom: 2px;
+  left: 3px;
+  width: 12px;
+  height: 9px;
+  border: 2px solid #1e293b;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  border-bottom: none;
+}
+.bus-decal-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 5px;
+}
+.bus-decal-band.white {
+  bottom: 18px;
+  background: #ffffff;
+}
+.bus-decal-band.gold {
+  bottom: 12px;
+}
+.bus-chrome-grill {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  width: 9px;
+  height: 18px;
+  background: #1e293b;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 1px;
+}
+.bus-chrome-grill span {
+  height: 2px;
+  background: #cbd5e1;
+  border-radius: 1px;
+}
+
+/* ═════════ 2. Cairo Microbus Model ═════════ */
+.v-model.microbus-cairo {
+  border-radius: 30px 10px 8px 12px;
+}
+.microbus-roof-rack {
+  position: absolute;
+  top: 4px;
+  left: 10px;
+  right: 10px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.microbus-dest-sign {
+  font-size: 8px;
+  font-weight: 900;
+  background: #0f172a;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.microbus-window-row {
+  position: absolute;
+  top: 22px;
+  left: 6px;
+  right: 8px;
+  height: 38px;
+  display: flex;
+  gap: 4px;
+}
+.m-win {
+  position: relative;
+  background: #bae6fd;
+  border: 2px solid #0f172a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.m-win.sloped-front {
+  flex: 1.4;
+  border-top-left-radius: 20px;
+  background: #7dd3fc;
+}
+.m-win.sliding-door-win {
+  flex: 1.2;
+}
+.m-win.rear-m-win {
+  flex: 1;
+  border-top-right-radius: 6px;
+}
+.talisman-sticker {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 10px;
+  z-index: 2;
+}
+.sliding-door-seam {
+  position: absolute;
+  top: 18px;
+  bottom: 0;
+  left: 55%;
+  width: 2px;
+  background: #0f172a;
+  opacity: 0.6;
+}
+.sliding-door-handle {
+  position: absolute;
+  top: 66px;
+  left: 51%;
+  width: 8px;
+  height: 3px;
+  background: #1e293b;
+  border-radius: 2px;
+}
+.microbus-racing-stripe {
+  position: absolute;
+  bottom: 15px;
+  left: 0;
+  right: 0;
+  height: 7px;
+  clip-path: polygon(0 0, 100% 0, 98% 100%, 0 100%);
+}
+.microbus-front-bumper {
+  position: absolute;
+  bottom: 2px;
+  left: -2px;
+  width: 14px;
+  height: 8px;
+  background: #334155;
+  border-radius: 3px;
+  border: 1.5px solid #0f172a;
+}
+
+/* ═════════ 3. Fire TokTok Model ═════════ */
+.v-model.toktok-fire {
+  width: 195px;
+  height: 110px;
+  border-radius: 18px 24px 10px 14px;
+}
+.toktok-canopy-roof {
+  position: absolute;
+  top: 2px;
+  left: 8px;
+  right: 6px;
+  height: 20px;
+  border-radius: 14px 14px 4px 4px;
+  border: 2px solid #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.canopy-title {
+  font-size: 8px;
+  font-weight: 900;
+  color: #0f172a;
+}
+.toktok-antenna {
+  position: absolute;
+  top: -24px;
+  right: 14px;
+  width: 2px;
+  height: 26px;
+  background: #94a3b8;
+}
+.antenna-flag {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  font-size: 11px;
+}
+.toktok-cabin-layout {
+  position: absolute;
+  top: 26px;
+  left: 6px;
+  right: 8px;
+  height: 45px;
+  display: flex;
+  gap: 4px;
+}
+.toktok-front-screen {
+  flex: 1;
+  position: relative;
+  background: #bae6fd;
+  border: 2px solid #0f172a;
+  border-top-left-radius: 14px;
+  overflow: hidden;
+}
+.toktok-handlebars {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 14px;
+  height: 4px;
+  background: #1e293b;
+  border-radius: 2px;
+}
+.toktok-open-entry {
+  flex: 1.6;
+  position: relative;
+  background: rgba(15, 23, 42, 0.25);
+  border: 2px solid #0f172a;
+  border-radius: 4px;
+}
+.rollbar-metal {
+  position: absolute;
+  width: 3px;
+  top: 0;
+  bottom: 0;
+  background: #475569;
+}
+.rollbar-metal.v1 { left: 30%; }
+.rollbar-metal.v2 { right: 30%; }
+.toktok-flame-decal {
+  position: absolute;
+  bottom: 12px;
+  left: 38%;
+  font-size: 18px;
+}
+.toktok-front-fork {
+  position: absolute;
+  bottom: -16px;
+  left: 20px;
+}
+.toktok-rear-wheels {
+  position: absolute;
+  bottom: -16px;
+  right: 22px;
+}
+.toktok-front-wheel {
+  width: 38px;
+  height: 38px;
+}
+.toktok-rear-wheel {
+  width: 44px;
+  height: 44px;
+}
+.toktok-exhaust-rocket {
+  position: absolute;
+  bottom: 8px;
+  right: -24px;
+  display: flex;
+  align-items: center;
+}
+.exhaust-pipe {
+  width: 18px;
+  height: 6px;
+  background: #475569;
+  border: 1.5px solid #0f172a;
+  border-radius: 3px;
+}
+.exhaust-fire-pulse {
+  font-size: 16px;
+  animation: flame-flicker 0.3s infinite alternate;
+}
+@keyframes flame-flicker {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  100% { transform: scale(1.25); opacity: 1; }
+}
+.toktok-center-light {
+  top: 50px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+}
+
+/* ═════════ 4. London Red Double Decker Model ═════════ */
+.v-model.london-double {
+  width: 240px;
+  height: 128px;
+  border-radius: 18px 12px 8px 14px;
+}
+.london-roof-dome {
+  position: absolute;
+  top: 4px;
+  left: 10px;
+  right: 10px;
+  height: 14px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.london-crest {
+  font-size: 8px;
+  font-weight: 900;
+  color: #fbbf24;
+}
+.london-window-tier {
+  position: absolute;
+  left: 8px;
+  right: 10px;
+  height: 28px;
+  display: flex;
+  gap: 4px;
+}
+.london-window-tier.upper {
+  top: 20px;
+}
+.london-window-tier.lower {
+  top: 54px;
+}
+.london-deck-divider {
+  position: absolute;
+  top: 50px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #0f172a;
+}
+.l-win {
+  position: relative;
+  flex: 1;
+  background: #bae6fd;
+  border: 1.5px solid #0f172a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.l-win.driver {
+  border-top-left-radius: 8px;
+  background: #7dd3fc;
+}
+
+/* ═════════ 5. Cyberpunk Gold 2077 Model ═════════ */
+.v-model.cyber-hyper {
+  width: 240px;
+  height: 94px;
+  border-radius: 34px 10px 6px 14px;
+}
+.cyber-rear-wing {
+  position: absolute;
+  top: -14px;
+  right: 6px;
+  width: 48px;
+  height: 18px;
+  display: flex;
+  align-items: flex-end;
+}
+.wing-main-plane {
+  flex: 1;
+  height: 4px;
+  background: #0f172a;
+  border: 1px solid #eab308;
+  border-radius: 2px;
+}
+.wing-fin {
+  width: 4px;
+  height: 14px;
+  background: #0f172a;
+  border: 1px solid #eab308;
+}
+.cyber-cockpit-canopy {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 38px;
+  height: 32px;
+  background: linear-gradient(180deg, #1e1b4b 0%, #064e3b 100%);
+  border: 2px solid #0f172a;
+  border-radius: 24px 8px 4px 14px;
+  overflow: hidden;
+}
+.cyber-hud-glow {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  width: 14px;
+  height: 6px;
+  background: #22d3ee;
+  border-radius: 2px;
+  box-shadow: 0 0 10px #22d3ee;
+}
+.cyber-front-lightbar {
+  position: absolute;
+  bottom: 22px;
+  left: 0;
+  width: 14px;
+  height: 4px;
+  background: #38bdf8;
+  box-shadow: 0 0 12px #38bdf8;
+  border-radius: 2px;
+}
+.cyber-neon-strip {
+  position: absolute;
+  bottom: 12px;
+  left: 10px;
+  right: 14px;
+  height: 3px;
+  border-radius: 2px;
+  box-shadow: 0 0 8px currentColor;
+}
+.cyber-underglow {
+  position: absolute;
+  bottom: -6px;
+  left: 12px;
+  right: 12px;
+  height: 4px;
+}
+.cyber-thrusters {
+  position: absolute;
+  bottom: 8px;
+  right: -10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.thruster-core {
+  width: 12px;
+  height: 6px;
+  background: #06b6d4;
+  border-radius: 3px;
+  box-shadow: 0 0 10px #06b6d4;
+}
+
+/* Lights & Volumetric Beams */
+.bus-front-optic-light {
+  position: absolute;
+  bottom: 14px;
+  left: 3px;
+  width: 9px;
+  height: 10px;
+  background: #fef08a;
+  border: 2px solid #0f172a;
+  border-radius: 3px;
+  box-shadow: 0 0 12px #fef08a;
+}
+.bus-rear-optic-light {
+  position: absolute;
+  bottom: 14px;
+  right: 3px;
+  width: 7px;
+  height: 10px;
+  background: #ef4444;
+  border: 2px solid #0f172a;
+  border-radius: 3px;
+  box-shadow: 0 0 8px #ef4444;
+}
+.bus-front-projector-beam {
+  position: absolute;
+  top: 55px;
+  left: -110px;
+  width: 120px;
+  height: 45px;
+  background: linear-gradient(to left, rgba(254, 240, 138, 0.55), transparent);
+  clip-path: polygon(100% 30%, 0 0, 0 100%, 100% 70%);
+  pointer-events: none;
+}
+.bus-front-projector-beam.cyber-beam {
+  background: linear-gradient(to left, rgba(56, 189, 248, 0.65), transparent);
+}
+.bus-front-projector-beam.toktok-beam {
+  top: 45px;
+}
+
+/* Wheels & Assemblies */
+.bus-undercarriage-wheels {
+  position: absolute;
+  bottom: -15px;
+  left: 22px;
+  right: 26px;
+  display: flex;
+  justify-content: space-between;
+}
+.wheel-assembly {
+  width: 36px;
+  height: 36px;
+  background: #1e293b;
+  border: 3.5px solid #0f172a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 5px 8px rgba(0, 0, 0, 0.5);
+}
+.rim-hub {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  background: #94a3b8;
+  border: 2px solid #475569;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rim-spoke {
+  width: 100%;
+  height: 2px;
+  background: #475569;
+}
+.rim-star {
+  width: 7px;
+  height: 7px;
+  background: #38bdf8;
+  border-radius: 50%;
+}
+.cyber-turbine {
+  background: #0284c7;
+  border-color: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+/* Camera Presets Bar */
+.camera-presets-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.presets-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 750;
+}
+.preset-chip {
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.preset-chip:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.preset-chip.selected {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+/* Showroom Controls Bar */
+.showroom-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.showroom-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.showroom-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.showroom-tool-btn.active-spin {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+}
+.showroom-tool-btn.horn-test-btn {
+  background: #ea580c;
+  color: #ffffff;
+  border-color: #f97316;
+}
+
+/* Vehicle Specs */
+.garage-specs-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.spec-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+.spec-item span {
+  white-space: nowrap;
+}
+.spec-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.spec-bar-fill {
+  height: 100%;
+  background: #38bdf8;
+  border-radius: 999px;
+}
+.spec-bar-fill.fun {
+  background: #f59e0b;
+}
+.spec-item small {
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+/* Sidebar Fleet & Workshop */
+.garage-sidebar-card {
+  background: var(--paper);
+  border: 2px solid var(--line);
+  border-radius: 24px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sidebar-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sidebar-section-title h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--ink);
+}
+.sidebar-section-title small {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--forest);
+}
+.garage-fleet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 290px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.fleet-item-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--paper);
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.fleet-item-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--forest) 40%, var(--line));
+}
+.fleet-item-card.selected {
+  border-color: var(--forest);
+  background: color-mix(in srgb, var(--forest) 8%, var(--paper));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.fleet-item-card.equipped {
+  border-color: #f59e0b;
+}
+.fleet-item-icon {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 2px solid #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+.fleet-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fleet-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.fleet-item-header strong {
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.status-badge.equipped {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #f59e0b;
+}
+.status-badge.owned {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #22c55e;
+}
+.status-badge.locked {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.fleet-item-desc {
+  margin: 0;
+  font-size: 11px;
+  color: var(--ink-soft);
+  line-height: 1.3;
+}
+.garage-action-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.garage-alert-box {
+  padding: 8px 12px;
+  background: #fef2f2;
+  border: 1.5px solid #ef4444;
+  color: #991b1b;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: center;
+}
+.garage-success-box {
+  padding: 8px 12px;
+  background: #f0fdf4;
+  border: 1.5px solid #22c55e;
+  color: #166534;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: center;
+}
+.equipped-notice-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: #fef3c7;
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 800;
+}
+.btn-full-width {
+  width: 100%;
+  justify-content: center;
+  padding: 12px;
+  font-size: 14px;
+}
+
+/* Paint Workshop */
+.garage-paint-workshop {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.workshop-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.workshop-header small {
+  color: var(--ink-soft);
+  margin-right: auto;
+  font-size: 11px;
+}
+.paint-swatches-grid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.paint-swatch-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+.paint-swatch-btn:hover {
+  transform: scale(1.15);
+}
+.paint-swatch-btn.active-swatch {
+  transform: scale(1.2);
+  border-color: #0f172a;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.35);
 }

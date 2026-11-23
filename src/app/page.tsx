@@ -5,12 +5,14 @@ import { ArrowLeft, BusFront, Camera, Clock3, DoorOpen, Moon, Play, Sparkles, Su
 import { useCallback, useEffect, useState } from "react";
 import GameRoom from "@/components/game-room";
 import SoloPractice from "@/components/solo-practice";
+import BusGarage from "@/components/bus-garage";
 import PlayerAvatar from "@/components/player-avatar";
 import ProfileModal from "@/components/profile-modal";
+import AnimatedCounter from "@/components/animated-counter";
 import { AVATARS } from "@/lib/game";
 import { ensureUser, getSupabase } from "@/lib/supabase";
 import { playGameSfx } from "@/lib/sfx";
-import { getPlayerProfile, type PlayerProfile } from "@/lib/profile";
+import { getPlayerProfile, getAffordableNewVehiclesCount, type PlayerProfile } from "@/lib/profile";
 
 type RoomEntry = { id: string; code: string };
 type ModalKind = "create" | "join" | null;
@@ -47,6 +49,7 @@ const INITIAL_PROFILE: PlayerProfile = {
 export default function HomePage() {
   const [room, setRoom] = useState<RoomEntry | null>(null);
   const [soloOpen, setSoloOpen] = useState(false);
+  const [garageOpen, setGarageOpen] = useState(false);
   const [modal, setModal] = useState<ModalKind>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState<PlayerProfile>(INITIAL_PROFILE);
@@ -133,6 +136,33 @@ export default function HomePage() {
       </a>
       <nav className="nav-links"><a href="#how">طريقة اللعب</a><a href="#points">النقاط</a><a href="#friends">اللعب مع أصحابك</a></nav>
       <div className="top-actions">
+        {(() => {
+          const newVehiclesAvailable = mounted ? getAffordableNewVehiclesCount(profile.totalScore) : 0;
+          return (
+            <button
+              className={`garage-pill-btn ${newVehiclesAvailable > 0 ? "has-unlock-alert" : ""}`}
+              onClick={() => {
+                setGarageOpen(true);
+                setSoloOpen(false);
+                setModal(null);
+                playGameSfx(sound, "tap");
+              }}
+              aria-label="جراج الأتوبيسات والورشة"
+            >
+              <span className="garage-pill-icon">🚐</span>
+              <span className="garage-pill-title">الجراج</span>
+              <span className="garage-pill-score">
+                <AnimatedCounter value={mounted ? profile.totalScore : 0} /> ⭐
+              </span>
+              {newVehiclesAvailable > 0 && (
+                <span className="garage-new-badge-pulse" title="تقدر تشتري مركبة جديدة بالنقاط!">
+                  +{newVehiclesAvailable} متاحة 🚀
+                </span>
+              )}
+            </button>
+          );
+        })()}
+
         <button
           className="profile-pill-btn"
           onClick={() => {
@@ -154,7 +184,33 @@ export default function HomePage() {
       </div>
     </header>
 
-    {room ? <GameRoom roomId={room.id} roomCode={room.code} sound={sound} motionEnabled={motionEnabled} onSound={(cue) => playGameSfx(sound, cue)} onToggleSound={toggleSound} onExit={exitRoom} /> : soloOpen ? <SoloPractice motionEnabled={motionEnabled} onSound={(cue) => playGameSfx(sound, cue)} onExit={() => setSoloOpen(false)} /> : <>
+    {room ? (
+      <GameRoom
+        roomId={room.id}
+        roomCode={room.code}
+        sound={sound}
+        motionEnabled={motionEnabled}
+        onSound={(cue) => playGameSfx(sound, cue)}
+        onToggleSound={toggleSound}
+        onExit={exitRoom}
+      />
+    ) : soloOpen ? (
+      <SoloPractice
+        motionEnabled={motionEnabled}
+        onSound={(cue) => playGameSfx(sound, cue)}
+        onExit={() => setSoloOpen(false)}
+      />
+    ) : garageOpen ? (
+      <BusGarage
+        motionEnabled={motionEnabled}
+        onSound={(cue) => playGameSfx(sound, cue)}
+        onExit={() => {
+          setGarageOpen(false);
+          setProfile(getPlayerProfile());
+        }}
+      />
+    ) : (
+      <>
       <section className="wrap hero" id="home">
         <motion.div className="hero-copy" initial={false} animate={{ opacity: 1, x: 0 }} transition={{ duration: motionEnabled ? .3 : 0, ease: "easeOut" }}>
           <div className="eyebrow"><span className="eyebrow-dot" /> لعبة الحروف اللي بتجمعنا</div>
@@ -164,6 +220,20 @@ export default function HomePage() {
             <button className="btn btn-primary" onClick={() => setModal("create")}><Play fill="currentColor" /> ابدأ اللعب <ArrowLeft /></button>
             <button className="btn btn-light" onClick={() => { setPrefillCode(""); setModal("join"); }}><DoorOpen /> انضم لغرفة</button>
             <button className="btn btn-light solo-hero-button" onClick={() => { setModal(null); setSoloOpen(true); }}><Sparkles /> اتدرّب لوحدك</button>
+            <button
+              className={`btn btn-light garage-hero-button ${mounted && getAffordableNewVehiclesCount(profile.totalScore) > 0 ? "has-new-alert" : ""}`}
+              onClick={() => {
+                setModal(null);
+                setSoloOpen(false);
+                setGarageOpen(true);
+                playGameSfx(sound, "tap");
+              }}
+            >
+              🚐 الجراج
+              {mounted && getAffordableNewVehiclesCount(profile.totalScore) > 0 && (
+                <span className="hero-unlock-badge">مركبة جديدة! 🔥</span>
+              )}
+            </button>
           </div>
           <div className="button-note"><span className="player-stack"><span>🦊</span><span>🐼</span><span>🐯</span><span>🐧</span></span><span>من لاعبين إلى ١٠ لاعبين · وكل لاعب من جهازه</span></div>
         </motion.div>
@@ -204,10 +274,11 @@ export default function HomePage() {
         </div>
       </section>
       <footer className="wrap footer"><div className="footer-brand"><span className="brand-mark"><BusFront /></span><span>أتوبيس كومبليت</span></div><span>لعبة الحروف والتحدّي بين الأصدقاء.</span></footer>
-    </>}
+    </>
+    )}
 
     <AnimatePresence>
-      {modal && !room && !soloOpen && <EntryDialog kind={modal} code={prefillCode} onClose={() => setModal(null)} onEnter={enterRoom} ready={ready} sound={sound} motionEnabled={motionEnabled} />}
+      {modal && !room && !soloOpen && !garageOpen && <EntryDialog kind={modal} code={prefillCode} onClose={() => setModal(null)} onEnter={enterRoom} ready={ready} sound={sound} motionEnabled={motionEnabled} />}
       {profileOpen && (
         <ProfileModal
           profile={profile}

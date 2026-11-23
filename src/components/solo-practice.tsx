@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, Bot, Brain, BusFront, Check, RotateCcw, Sparkles
 import { useEffect, useMemo, useRef, useState } from "react";
 import { answerStartsWithLetter, ARABIC_LETTERS, CATEGORIES, scoreAnswers, type CategoryId } from "@/lib/game";
 import { requestGameAi } from "@/lib/game-ai-client";
-import { getPlayerProfile, recordMatchOutcome, type PlayerProfile } from "@/lib/profile";
+import { checkAndUnlockBadges, getPlayerProfile, recordMatchOutcome, type PlayerProfile, type SecretBadge } from "@/lib/profile";
 import BusAnimation from "@/components/bus-animation";
 import type { SfxCue } from "@/lib/sfx";
 
@@ -34,8 +34,10 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
   const [busy, setBusy] = useState(false);
   const [judging, setJudging] = useState(false);
   const [showBusAnim, setShowBusAnim] = useState(false);
+  const [badgeToast, setBadgeToast] = useState<SecretBadge | null>(null);
   const [error, setError] = useState("");
   const aiRequestId = useRef(0);
+  const roundStartTimeRef = useRef(Date.now());
 
   useEffect(() => { setName(localStorage.getItem("bus-name")?.trim() || "اللاعب"); }, []);
 
@@ -68,6 +70,7 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
   };
 
   const startRound = async (againstAi: boolean, chosenLetter = letter) => {
+    roundStartTimeRef.current = Date.now();
     setError("");
     setJudgments({});
     setJudging(false);
@@ -163,10 +166,15 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
       const rScore = Object.values(roundSc.rival ?? {}).reduce<number>((s, p) => s + (p ?? 0), 0);
 
       setStage("results");
+      let streak: number | undefined;
+      let totalScore: number | undefined;
+
       if (withOpponent) {
         const won = pScore > rScore;
         const tied = pScore === rScore;
         const outcome = recordMatchOutcome({ won, tied, score: pScore });
+        streak = outcome.profile.winStreak;
+        totalScore = outcome.profile.totalScore;
         if (won && outcome.profile.winStreak >= 2) {
           onSound("streak");
         } else if (won) {
@@ -177,8 +185,29 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
           onSound("bus");
         }
       } else {
-        recordMatchOutcome({ won: false, tied: true, score: pScore });
+        const outcome = recordMatchOutcome({ won: false, tied: true, score: pScore });
+        totalScore = outcome.profile.totalScore;
         onSound("bus");
+      }
+
+      const durationMs = Date.now() - roundStartTimeRef.current;
+      const allRejected = categories.length > 0 && categories.every((c) => returned[`player_${c}`]?.verdict === "invalid");
+      const fullMarks = categories.length > 0 && categories.every((c) => returned[`player_${c}`]?.verdict === "valid") && Object.values(roundSc.you ?? {}).every((s) => (s ?? 0) >= 10);
+      const closeWin = withOpponent && pScore > rScore && (pScore - rScore <= 10);
+
+      const unlockedBadges = checkAndUnlockBadges({
+        durationMs,
+        streak,
+        fullMarks,
+        allRejected,
+        closeWin,
+        totalScore
+      });
+
+      if (unlockedBadges.length > 0) {
+        setBadgeToast(unlockedBadges[0]);
+        setTimeout(() => setBadgeToast(null), 4500);
+        onSound("badge");
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذّر تحكيم الإجابات بواسطة الذكاء الاصطناعي. جرّب مرة أخرى.");
@@ -248,6 +277,22 @@ export default function SoloPractice({ motionEnabled, onSound, onExit }: SoloPra
         })}</div>
         <div className="solo-game-footer"><button className="btn btn-light" onClick={() => { setStage("setup"); setError(""); }}><ArrowRight /> إعدادات التدريب</button><button className="btn btn-primary" onClick={() => void startRound(withOpponent, newLetter())}><RotateCcw /> جولة جديدة</button></div>
       </motion.section>}
+    </AnimatePresence>
+    <AnimatePresence>
+      {badgeToast && (
+        <motion.div
+          className="badge-toast-alert"
+          initial={motionEnabled ? { opacity: 0, y: -24, scale: 0.92 } : false}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -24, scale: 0.92 }}
+        >
+          <span className="badge-toast-icon">{badgeToast.icon}</span>
+          <div className="badge-toast-text">
+            <strong>لقب سرّي جديد: {badgeToast.title}! 🎉</strong>
+            <small>{badgeToast.description}</small>
+          </div>
+        </motion.div>
+      )}
     </AnimatePresence>
     {showBusAnim && <BusAnimation onComplete={() => setShowBusAnim(false)} />}
   </section>;
