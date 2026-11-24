@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Award, Camera, Check, Copy, Flame, Lock, Play, Sparkles, Trophy, User, X, Zap } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Award, Camera, Check, ChevronLeft, Copy, Flame, Lock, Play, Sparkles, Trophy, User, X, Zap } from "lucide-react";
 import { useState } from "react";
 import PlayerAvatar from "@/components/player-avatar";
 import { AVATARS } from "@/lib/game";
@@ -36,7 +36,8 @@ export default function ProfileModal({
   const [avatar, setAvatar] = useState(profile.avatar);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"stats" | "badges" | "edit">("stats");
+  const [activeTab, setActiveTab] = useState<"stats" | "edit">("stats");
+  const [showBadgesModal, setShowBadgesModal] = useState(false);
   const [badgeFilter, setBadgeFilter] = useState<"all" | "unlocked" | "locked">("all");
   const [savedToast, setSavedToast] = useState(false);
 
@@ -164,15 +165,6 @@ export default function ProfileModal({
             <Trophy size={14} /> الإحصائيات
           </button>
           <button
-            className={`profile-tab ${activeTab === "badges" ? "active" : ""}`}
-            onClick={() => {
-              setActiveTab("badges");
-              onSound("badge");
-            }}
-          >
-            <Award size={14} /> ألقاب سرية ({unlockedCount}/{badges.length})
-          </button>
-          <button
             className={`profile-tab ${activeTab === "edit" ? "active" : ""}`}
             onClick={() => {
               setActiveTab("edit");
@@ -180,6 +172,20 @@ export default function ProfileModal({
             }}
           >
             <User size={14} /> تعديل الحساب
+          </button>
+          <button
+            className="profile-tab profile-tab-badges-btn"
+            onClick={() => {
+              setShowBadgesModal(true);
+              onSound("badge");
+            }}
+          >
+            <span className="badges-btn-label">
+              <Award size={15} /> الألقاب السرية ({unlockedCount}/{badges.length})
+            </span>
+            <span className="badges-btn-hint">
+              عرض الكل <ChevronLeft size={14} />
+            </span>
           </button>
         </div>
 
@@ -257,105 +263,6 @@ export default function ProfileModal({
           </motion.div>
         )}
 
-        {activeTab === "badges" && (
-          <motion.div
-            className="profile-tab-content"
-            initial={motionEnabled ? { opacity: 0, y: 8 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div className="badges-header-summary">
-              <div className="badges-progress-text">
-                <strong>🎖️ إنجازات وألقاب الأتوبيس السرية</strong>
-                <small>
-                  فتحت {unlockedCount} من أصل {badges.length} لقب ({Math.round((unlockedCount / badges.length) * 100)}%)
-                </small>
-              </div>
-              <div className="badges-progress-bar-bg">
-                <div
-                  className="badges-progress-bar-fill"
-                  style={{ width: `${(unlockedCount / badges.length) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="badges-filter-bar">
-              <button
-                className={`choice-chip ${badgeFilter === "all" ? "selected" : ""}`}
-                onClick={() => {
-                  setBadgeFilter("all");
-                  onSound("tap");
-                }}
-              >
-                الكل ({badges.length})
-              </button>
-              <button
-                className={`choice-chip ${badgeFilter === "unlocked" ? "selected" : ""}`}
-                onClick={() => {
-                  setBadgeFilter("unlocked");
-                  onSound("tap");
-                }}
-              >
-                المفتوحة ({unlockedCount}) ✓
-              </button>
-              <button
-                className={`choice-chip ${badgeFilter === "locked" ? "selected" : ""}`}
-                onClick={() => {
-                  setBadgeFilter("locked");
-                  onSound("tap");
-                }}
-              >
-                المتبقية ({badges.length - unlockedCount}) 🔒
-              </button>
-            </div>
-
-            <div className="secret-badges-grid">
-              {badges
-                .filter((b) => {
-                  if (badgeFilter === "unlocked") return b.isUnlocked;
-                  if (badgeFilter === "locked") return !b.isUnlocked;
-                  return true;
-                })
-                .map((badge) => (
-                  <motion.div
-                    key={badge.id}
-                    className={`badge-card ${badge.isUnlocked ? "unlocked" : "locked"}`}
-                    whileHover={motionEnabled ? { y: -2, scale: 1.01 } : undefined}
-                  >
-                    <div
-                      className="badge-icon-wrap"
-                      style={{
-                        borderColor: badge.isUnlocked ? badge.color : "var(--line)",
-                        background: badge.isUnlocked
-                          ? `color-mix(in srgb, ${badge.color} 15%, var(--paper))`
-                          : "var(--paper)",
-                      }}
-                    >
-                      <span className="badge-icon-char">{badge.isUnlocked ? badge.icon : <Lock size={16} />}</span>
-                    </div>
-                    <div className="badge-info">
-                      <div className="badge-title-row">
-                        <strong className="badge-title">{badge.title}</strong>
-                        {badge.isUnlocked ? (
-                          <span className="badge-status-pill unlocked">تم الفتح ✓</span>
-                        ) : (
-                          <span className="badge-status-pill locked">لقب مقفول 🔒</span>
-                        )}
-                      </div>
-                      <p className="badge-desc">{badge.description}</p>
-                      <div className="badge-unlock-guide">
-                        <span className="badge-guide-icon">🎯</span>
-                        <span className="badge-guide-text">
-                          <strong>طريقة الحصول عليه:</strong> {badge.howToUnlock || badge.hint}
-                        </span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-            </div>
-          </motion.div>
-        )}
-
         {activeTab === "edit" && (
           <motion.div
             className="profile-tab-content"
@@ -421,6 +328,145 @@ export default function ProfileModal({
           </motion.div>
         )}
       </motion.section>
+
+      <AnimatePresence>
+        {showBadgesModal && (
+          <motion.div
+            className="badges-overlay-backdrop"
+            initial={motionEnabled ? { opacity: 0 } : false}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: motionEnabled ? 0.18 : 0 }}
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowBadgesModal(false);
+                onSound("tap");
+              }
+            }}
+          >
+            <motion.section
+              className="modal badges-overlay-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="الألقاب السرية"
+              initial={motionEnabled ? { opacity: 0, scale: 0.94, y: 18 } : false}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ type: "spring", stiffness: 280, damping: 24 }}
+            >
+              <div className="badges-overlay-header">
+                <div className="badges-overlay-title">
+                  <span className="badges-overlay-icon">🎖️</span>
+                  <div>
+                    <h3>الألقاب والإنجازات السرية</h3>
+                    <small>اضغط على أي قسم للتصفية واكتشاف طرق الفتح</small>
+                  </div>
+                </div>
+                <button
+                  className="close-btn"
+                  onClick={() => {
+                    setShowBadgesModal(false);
+                    onSound("tap");
+                  }}
+                  aria-label="رجوع للبروفايل"
+                >
+                  <X size={17} />
+                </button>
+              </div>
+
+              <div className="badges-header-summary">
+                <div className="badges-progress-text">
+                  <strong>تقدمك في الألقاب</strong>
+                  <small>
+                    فتحت {unlockedCount} من أصل {badges.length} ({Math.round((unlockedCount / badges.length) * 100)}%)
+                  </small>
+                </div>
+                <div className="badges-progress-bar-bg">
+                  <div
+                    className="badges-progress-bar-fill"
+                    style={{ width: `${(unlockedCount / badges.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="badges-filter-bar">
+                <button
+                  className={`choice-chip ${badgeFilter === "all" ? "selected" : ""}`}
+                  onClick={() => {
+                    setBadgeFilter("all");
+                    onSound("tap");
+                  }}
+                >
+                  الكل ({badges.length})
+                </button>
+                <button
+                  className={`choice-chip ${badgeFilter === "unlocked" ? "selected" : ""}`}
+                  onClick={() => {
+                    setBadgeFilter("unlocked");
+                    onSound("tap");
+                  }}
+                >
+                  المفتوحة ({unlockedCount}) ✓
+                </button>
+                <button
+                  className={`choice-chip ${badgeFilter === "locked" ? "selected" : ""}`}
+                  onClick={() => {
+                    setBadgeFilter("locked");
+                    onSound("tap");
+                  }}
+                >
+                  المتبقية ({badges.length - unlockedCount}) 🔒
+                </button>
+              </div>
+
+              <div className="secret-badges-grid badges-overlay-list">
+                {badges
+                  .filter((b) => {
+                    if (badgeFilter === "unlocked") return b.isUnlocked;
+                    if (badgeFilter === "locked") return !b.isUnlocked;
+                    return true;
+                  })
+                  .map((badge) => (
+                    <motion.div
+                      key={badge.id}
+                      className={`badge-card ${badge.isUnlocked ? "unlocked" : "locked"}`}
+                      whileHover={motionEnabled ? { y: -2, scale: 1.01 } : undefined}
+                    >
+                      <div
+                        className="badge-icon-wrap"
+                        style={{
+                          borderColor: badge.isUnlocked ? badge.color : "var(--line)",
+                          background: badge.isUnlocked
+                            ? `color-mix(in srgb, ${badge.color} 15%, var(--paper))`
+                            : "var(--paper)",
+                        }}
+                      >
+                        <span className="badge-icon-char">{badge.isUnlocked ? badge.icon : <Lock size={16} />}</span>
+                      </div>
+                      <div className="badge-info">
+                        <div className="badge-title-row">
+                          <strong className="badge-title">{badge.title}</strong>
+                          {badge.isUnlocked ? (
+                            <span className="badge-status-pill unlocked">تم الفتح ✓</span>
+                          ) : (
+                            <span className="badge-status-pill locked">مقفول 🔒</span>
+                          )}
+                        </div>
+                        <p className="badge-desc">{badge.description}</p>
+                        <div className="badge-unlock-guide">
+                          <span className="badge-guide-icon">🎯</span>
+                          <span className="badge-guide-text">
+                            <strong>طريقة الحصول عليه:</strong> {badge.howToUnlock || badge.hint}
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+              </div>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

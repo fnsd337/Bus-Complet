@@ -804,6 +804,34 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: var(--forest-dark);
   box-shadow: 2px 2px 0 var(--hard-shadow);
 }
+.profile-tab-badges-btn {
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-color: color-mix(in srgb, #f59e0b 65%, var(--line));
+  background: color-mix(in srgb, #f59e0b 12%, var(--paper));
+  color: var(--ink);
+  box-shadow: 2px 2px 0 var(--hard-shadow);
+}
+.profile-tab-badges-btn:hover {
+  background: color-mix(in srgb, #f59e0b 20%, var(--paper));
+  border-color: #d97706;
+}
+.badges-btn-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 850;
+  color: #b45309;
+}
+.badges-btn-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--forest-dark);
+}
 .profile-tab-content {
   padding: 0 22px 22px;
 }
@@ -1432,6 +1460,105 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .badge-card.locked .badge-guide-text strong {
   color: #ea580c;
+}
+
+/* Dedicated Badges Overlay Modal (above Profile Modal) */
+.badges-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(13, 30, 23, 0.58);
+  backdrop-filter: blur(6px);
+}
+.badges-overlay-modal {
+  width: min(540px, 100%);
+  max-height: min(88vh, 760px);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.badges-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.badges-overlay-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.badges-overlay-icon {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.badges-overlay-title h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 850;
+  color: var(--ink);
+}
+.badges-overlay-title small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.secret-badges-grid.badges-overlay-list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  grid-template-columns: 1fr;
+  overflow-y: auto;
+  padding: 2px 2px 4px;
+}
+
+@media (max-width: 640px) {
+  .profile-modal {
+    overflow-y: auto;
+  }
+  .badges-overlay-backdrop {
+    padding: 10px;
+  }
+  .badges-overlay-modal {
+    padding: 16px 14px;
+    max-height: 90vh;
+    border-radius: 18px;
+  }
+  .badges-overlay-title h3 {
+    font-size: 15px;
+  }
+  .badges-filter-bar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .badges-filter-bar .choice-chip {
+    padding: 6px 4px;
+    font-size: 11px;
+    text-align: center;
+    justify-content: center;
+    white-space: nowrap;
+  }
+  .badge-card {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .badge-icon-wrap {
+    width: 38px;
+    height: 38px;
+    font-size: 19px;
+  }
+  .badge-title {
+    font-size: 13px;
+  }
 }
 
 .badge-toast-alert {
