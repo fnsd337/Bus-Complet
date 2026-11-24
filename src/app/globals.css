@@ -1598,7 +1598,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   margin: 10px 0;
   cursor: grab;
   user-select: none;
-  touch-action: pan-y;
+  touch-action: none;
 }
 .showroom-scene-viewport.dragging {
   cursor: grabbing;
@@ -1656,7 +1656,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   justify-content: center;
 }
 
-/* Turntable Cylinder Platform */
+/* Turntable Cylinder Platform (Positioned cleanly under the wheels) */
 .pedestal-cylinder-base {
   position: absolute;
   width: 270px;
@@ -1664,7 +1664,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border-radius: 50%;
   background: radial-gradient(circle, #1e293b 0%, #090d16 80%);
   border: 4px solid #38bdf8;
-  transform: rotateX(80deg) translateZ(-45px);
+  transform: translateY(58px) rotateX(90deg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1709,9 +1709,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   text-align: center;
 }
 
-/* Model Mount & Shadow */
+/* Model Mount & Shadow (Vehicle elevated safely above the floor plate) */
 .pedestal-model-mount {
   position: relative;
+  transform: translateY(-20px);
   transform-style: preserve-3d;
   display: flex;
   align-items: center;
@@ -1719,11 +1720,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .model-ground-shadow {
   position: absolute;
-  bottom: -22px;
+  transform: translateY(74px) rotateX(90deg);
   width: 230px;
-  height: 44px;
+  height: 110px;
   background: radial-gradient(ellipse, rgba(0, 0, 0, 0.75) 0%, transparent 70%);
   border-radius: 50%;
+  pointer-events: none;
 }
 
 /* Universal Base Vehicle Shell */
@@ -2626,4 +2628,187 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   transform: scale(1.2);
   border-color: #0f172a;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.35);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Bus Garage Responsive Media Queries (Mobile & Small Screens)
+   ══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .garage-page {
+    padding-top: 14px;
+    padding-bottom: 40px;
+  }
+  .garage-header {
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .garage-title-group h1 {
+    font-size: 20px;
+  }
+  .garage-title-group p {
+    font-size: 11.5px;
+  }
+  .garage-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .garage-points-pill {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  /* Showroom Card on Mobile */
+  .garage-showroom-card {
+    padding: 16px 14px 16px;
+    border-radius: 20px;
+    min-height: 420px;
+  }
+  .showroom-header-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+  .showroom-badge-pill {
+    padding: 3px 8px;
+    gap: 6px;
+  }
+  .showroom-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+  .showroom-name {
+    font-size: 12px;
+  }
+  .showroom-angle-pill {
+    padding: 3px 8px;
+    font-size: 10.5px;
+  }
+
+  /* Showroom Viewport & Turntable Scaling */
+  .showroom-scene-viewport {
+    min-height: 250px;
+    margin: 4px 0 6px;
+  }
+  .showroom-pedestal-assembly {
+    transform-origin: center center;
+    scale: 0.9;
+  }
+
+  /* Drag hint */
+  .showroom-drag-hint {
+    font-size: 10px;
+    text-align: center;
+    padding: 0 4px;
+  }
+
+  /* Camera Presets Bar: Hide label so 3 chips share 100% width in 1 row */
+  .camera-presets-bar {
+    width: 100%;
+    gap: 6px;
+    margin-top: 6px;
+    flex-wrap: nowrap;
+  }
+  .presets-label {
+    display: none;
+  }
+  .preset-chip {
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+    font-size: 11px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  /* Showroom Controls Bar: 2x2 Grid for Perfect Alignment */
+  .showroom-controls-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+    margin-top: 10px;
+  }
+  .showroom-tool-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 6px;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  /* Specs: Single Column Layout with Full-Width Bars */
+  .garage-specs-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+  }
+  .spec-item {
+    display: grid;
+    grid-template-columns: 88px 1fr 34px;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+  }
+  .spec-item span {
+    font-size: 11px;
+  }
+  .spec-item small {
+    font-size: 11px;
+    text-align: left;
+  }
+
+  /* Sidebar Card & Fleet on Mobile */
+  .garage-sidebar-card {
+    padding: 16px 14px;
+    border-radius: 20px;
+    gap: 14px;
+  }
+  .fleet-item-card {
+    padding: 8px 10px;
+    gap: 10px;
+  }
+  .fleet-item-icon {
+    width: 38px;
+    height: 38px;
+    font-size: 19px;
+  }
+  .fleet-item-header strong {
+    font-size: 12.5px;
+  }
+  .fleet-item-desc {
+    font-size: 10.5px;
+  }
+
+  /* Paint Swatches: Centered & Generous Padding */
+  .garage-paint-workshop {
+    padding-bottom: 8px;
+  }
+  .paint-swatches-grid {
+    justify-content: center;
+    gap: 8px;
+  }
+  .paint-swatch-btn {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+@media (max-width: 380px) {
+  .showroom-pedestal-assembly {
+    scale: 0.82;
+  }
+  .preset-chip {
+    font-size: 10px;
+    padding: 5px 2px;
+  }
+  .showroom-tool-btn {
+    font-size: 10.5px;
+    padding: 7px 4px;
+    gap: 4px;
+  }
+  .spec-item {
+    grid-template-columns: 82px 1fr 30px;
+    gap: 6px;
+  }
 }

@@ -522,17 +522,6 @@ export default function BusGarage({ motionEnabled, onSound, onExit }: BusGarageP
             </button>
 
             <button
-              className={`showroom-tool-btn ${autoRotate ? "active-spin" : ""}`}
-              onClick={() => {
-                setAutoRotate((prev) => !prev);
-                onSound("tap");
-              }}
-              title="تشغيل أو إيقاف الدوران التلقائي"
-            >
-              <RotateCw size={16} /> {autoRotate ? "إيقاف الدوران" : "دوران تلقائي 360°"}
-            </button>
-
-            <button
               className="showroom-tool-btn"
               onClick={() => {
                 setRotationAngle((prev) => (prev + 45) % 360);
@@ -541,6 +530,17 @@ export default function BusGarage({ motionEnabled, onSound, onExit }: BusGarageP
               title="تدوير شمال"
             >
               تدوير شمال <RotateCw size={16} />
+            </button>
+
+            <button
+              className={`showroom-tool-btn ${autoRotate ? "active-spin" : ""}`}
+              onClick={() => {
+                setAutoRotate((prev) => !prev);
+                onSound("tap");
+              }}
+              title="تشغيل أو إيقاف الدوران التلقائي"
+            >
+              <RotateCw size={16} /> {autoRotate ? "إيقاف الدوران" : "دوران تلقائي 360°"}
             </button>
 
             <button
